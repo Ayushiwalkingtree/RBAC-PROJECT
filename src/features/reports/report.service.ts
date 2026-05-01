@@ -1,24 +1,44 @@
 import { mockDbService } from '@/mock/services/mockDb.service';
-import type { Report } from '@/shared/types/domain.types';
+import { PERMISSION_KEYS } from '@/shared/constants/permission.constants';
+import { canAccess } from '@/shared/utils/rbac';
+import { buildReportRows, toBusinessResourceName } from '@/shared/utils/rbacDisplay.adapter';
+import type { EffectivePermissions, ResourceRecord } from '@/shared/types/rbac.types';
 
 const escapeCsv = (value: string): string => `"${value.replaceAll('"', '""')}"`;
 
+export type AccessibleReport = {
+  id: string;
+  resourceKey: string;
+  name: string;
+  category: string;
+  description: string;
+  canDownload: boolean;
+};
+
 export const reportService = {
-  listReports: async (orgId: string): Promise<Report[]> => {
+  listAccessibleReports: async (permissions: EffectivePermissions): Promise<AccessibleReport[]> => {
     const database = await mockDbService.getDatabase();
-    return database.reports.filter((report) => report.orgId === orgId);
+    return buildReportRows(database.resources)
+      .filter((resource) => canAccess(permissions, resource.resourceKey, PERMISSION_KEYS.view))
+      .map((resource: ResourceRecord) => ({
+        id: resource.id,
+        resourceKey: resource.resourceKey,
+        name: toBusinessResourceName(resource),
+        category: resource.displayCategory ?? resource.resourceGroup,
+        description: resource.description,
+        canDownload: canAccess(permissions, resource.resourceKey, PERMISSION_KEYS.download),
+      }));
   },
 
-  exportReportsCsv: async (orgId: string): Promise<{ fileName: string; csv: string }> => {
-    const reports = await reportService.listReports(orgId);
+  exportReportCsv: async (report: AccessibleReport): Promise<{ fileName: string; csv: string }> => {
     const rows = [
-      ['Name', 'Category', 'Updated At'],
-      ...reports.map((report) => [report.name, report.category, report.updatedAt]),
+      ['Report', 'Category', 'Description'],
+      [report.name, report.category, report.description],
     ];
     const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\n');
 
     return {
-      fileName: `reports-${orgId}.csv`,
+      fileName: `${report.resourceKey.toLowerCase()}.csv`,
       csv,
     };
   },

@@ -1,6 +1,6 @@
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Chip, Divider, Paper, Stack, Typography } from '@mui/material';
+import { Alert, Box, Chip, Divider, Paper, Stack, Tooltip, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { permissionService } from '@/features/permissions/permission.service';
@@ -12,6 +12,7 @@ import { ResourceTypeBadge } from '@/shared/components/ResourceTypeBadge';
 import { useToast } from '@/shared/components/useToast';
 import { PERMISSION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
 import { usePermission } from '@/shared/hooks/usePermission';
+import { buildDisplayPermissionRows } from '@/shared/utils/rbacDisplay.adapter';
 import type { ResourceRecord, Role, RolePermissionGrants } from '@/shared/types/rbac.types';
 
 const countGrants = (permissions: RolePermissionGrants): number =>
@@ -32,13 +33,14 @@ export const PermissionsMatrixPage = () => {
   const canConfigure = can(RESOURCE_KEYS.permissionGrantApi, PERMISSION_KEYS.configure);
   const selectedRole = roles.find((role) => role.id === selectedRoleId);
 
-  const groupedResources = useMemo(
+  const displayRows = useMemo(() => buildDisplayPermissionRows(resources), [resources]);
+  const groupedRows = useMemo(
     () =>
-      resources.reduce<Record<string, ResourceRecord[]>>((groups, resource) => ({
+      displayRows.reduce<Record<string, typeof displayRows>>((groups, row) => ({
         ...groups,
-        [resource.resourceGroup]: [...(groups[resource.resourceGroup] ?? []), resource],
+        [row.displayGroup]: [...(groups[row.displayGroup] ?? []), row],
       }), {}),
-    [resources],
+    [displayRows],
   );
 
   const loadMatrix = async () => {
@@ -155,27 +157,29 @@ export const PermissionsMatrixPage = () => {
               </Box>
               {!canConfigure && <Alert severity="info">You can view this matrix, but cannot configure grants.</Alert>}
               <Divider />
-              {Object.entries(groupedResources).map(([group, groupResources]) => (
+              {Object.entries(groupedRows).map(([group, rows]) => (
                 <Box key={group}>
                   <Typography variant="h6" sx={{ mb: 1 }}>{group}</Typography>
                   <Stack spacing={1.25}>
-                    {groupResources.map((resource) => (
-                      <Paper key={resource.id} elevation={0} sx={{ p: 1.5, border: 1, borderColor: 'divider' }}>
+                    {rows.map((row) => (
+                      <Paper key={row.id} elevation={0} sx={{ p: 1.5, border: 1, borderColor: 'divider' }}>
                         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
                           <Box>
                             <Stack direction="row" spacing={1} alignItems="center">
-                              <Typography variant="subtitle2" fontWeight={900}>{resource.resourceName}</Typography>
-                              <ResourceTypeBadge type={resource.resourceType} />
+                              <Tooltip title={row.technicalSummary}>
+                                <Typography variant="subtitle2" fontWeight={900}>{row.displayName}</Typography>
+                              </Tooltip>
+                              <ResourceTypeBadge type={row.resourceType} />
                             </Stack>
-                            <Typography variant="caption" color="text.secondary">{resource.resourceKey}</Typography>
+                            <Typography variant="caption" color="text.secondary">Technical details available on hover</Typography>
                           </Box>
                           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                            {resource.allowedPermissions.map((permission) => (
+                            {row.displayActions.map((permission) => (
                               <PermissionChip
-                                key={`${resource.resourceKey}-${permission.key}`}
-                                label={permission.key}
-                                selected={(draftPermissions[resource.resourceKey] ?? []).includes(permission.key)}
-                                onClick={() => toggleGrant(resource.resourceKey, permission.key)}
+                                key={`${permission.internalResourceKey}-${permission.internalPermissionKey}`}
+                                label={permission.label}
+                                selected={(draftPermissions[permission.internalResourceKey] ?? []).includes(permission.internalPermissionKey)}
+                                onClick={() => toggleGrant(permission.internalResourceKey, permission.internalPermissionKey)}
                               />
                             ))}
                           </Stack>

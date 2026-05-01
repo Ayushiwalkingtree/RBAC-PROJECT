@@ -1,15 +1,13 @@
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import { Chip, Stack } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { reportService } from '@/features/reports/report.service';
+import { reportService, type AccessibleReport } from '@/features/reports/report.service';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { AppButton } from '@/shared/components/AppButton';
 import { DataTable } from '@/shared/components/DataTable';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useToast } from '@/shared/components/useToast';
-import { RESOURCE_PERMISSION_RULES } from '@/shared/constants/permission.constants';
-import { usePermission } from '@/shared/hooks/usePermission';
-import type { Report } from '@/shared/types/domain.types';
 
 const downloadCsv = (fileName: string, csv: string) => {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -22,65 +20,72 @@ const downloadCsv = (fileName: string, csv: string) => {
 };
 
 export const ReportsPage = () => {
-  const session = useAuthStore((state) => state.session);
-  const { canAny } = usePermission();
+  const permissions = useAuthStore((state) => state.session?.permissions ?? {});
   const { showToast } = useToast();
-  const [reports, setReports] = useState<Report[]>([]);
-  const [isExporting, setIsExporting] = useState(false);
-  const canDownloadReports =
-    canAny(RESOURCE_PERMISSION_RULES.reports.downloadDaily) ||
-    canAny(RESOURCE_PERMISSION_RULES.reports.downloadMonthly);
+  const [reports, setReports] = useState<AccessibleReport[]>([]);
+  const [exportingReportId, setExportingReportId] = useState<string | null>(null);
 
   const loadReports = async () => {
-    if (!session) {
-      return;
-    }
-
-    setReports(await reportService.listReports(session.org.id));
+    setReports(await reportService.listAccessibleReports(permissions));
   };
 
   useEffect(() => {
     void loadReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.org.id]);
+  }, [permissions]);
 
-  const handleExport = async () => {
-    if (!session) {
-      return;
-    }
-
-    setIsExporting(true);
+  const handleExport = async (report: AccessibleReport) => {
+    setExportingReportId(report.id);
     try {
-      const result = await reportService.exportReportsCsv(session.org.id);
+      const result = await reportService.exportReportCsv(report);
       downloadCsv(result.fileName, result.csv);
-      showToast('Reports CSV generated.');
+      showToast(`${report.name} downloaded.`);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Unable to export reports.', 'error');
+      showToast(error instanceof Error ? error.message : 'Unable to download report.', 'error');
     } finally {
-      setIsExporting(false);
+      setExportingReportId(null);
     }
   };
 
   return (
     <>
-      <PageHeader title="Reports" subtitle="Tenant analytics and export workflows.">
-        {canDownloadReports && (
-          <AppButton startIcon={<FileDownloadIcon />} loading={isExporting} onClick={() => void handleExport()}>
-            Export reports
-          </AppButton>
-        )}
-      </PageHeader>
+      <PageHeader title="Reports" subtitle="Reports available for your role permissions." />
 
       {reports.length === 0 ? (
-        <EmptyState title="No reports found" description="Report rows appear here when available." />
+        <EmptyState title="You do not have access to reports" description="Ask an administrator to grant report view permissions." />
       ) : (
         <DataTable
           rows={reports}
           getRowId={(report) => report.id}
           columns={[
-            { id: 'name', label: 'Name', render: (report) => report.name },
-            { id: 'category', label: 'Category', render: (report) => report.category },
-            { id: 'updatedAt', label: 'Updated', render: (report) => report.updatedAt },
+            { id: 'name', label: 'Report', render: (report) => report.name },
+            { id: 'category', label: 'Module', render: (report) => report.category },
+            { id: 'description', label: 'Description', render: (report) => report.description },
+            {
+              id: 'access',
+              label: 'Access',
+              render: (report) => (
+                <Stack direction="row" spacing={1}>
+                  <Chip size="small" color="primary" label="View" />
+                  {report.canDownload && <Chip size="small" color="secondary" label="Download" />}
+                </Stack>
+              ),
+            },
+            {
+              id: 'actions',
+              label: 'Actions',
+              render: (report) =>
+                report.canDownload ? (
+                  <AppButton
+                    size="small"
+                    startIcon={<FileDownloadIcon />}
+                    loading={exportingReportId === report.id}
+                    onClick={() => void handleExport(report)}
+                  >
+                    Download
+                  </AppButton>
+                ) : null,
+            },
           ]}
         />
       )}

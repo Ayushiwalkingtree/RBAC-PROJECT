@@ -32,6 +32,7 @@ const fallbackIconForResource = (resource: ResourceRecord): string => {
 
 const navigableTypes = new Set<string>([
   RESOURCE_TYPES.menu,
+  RESOURCE_TYPES.page,
   RESOURCE_TYPES.dashboard,
   RESOURCE_TYPES.report,
 ]);

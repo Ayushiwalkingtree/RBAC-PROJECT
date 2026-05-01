@@ -13,6 +13,9 @@ export type ResourceRecord = {
   resourceGroup: string;
   description: string;
   allowedPermissions: ResourcePermissionDefinition[];
+  displayName?: string;
+  displayCategory?: string;
+  displayActionLabel?: string;
   sequenceNo?: number;
   parentResourceKey?: ResourceKey;
   httpMethod?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';

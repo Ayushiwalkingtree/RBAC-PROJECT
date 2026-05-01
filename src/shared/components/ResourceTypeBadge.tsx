@@ -3,6 +3,7 @@ import type { ResourceType } from '@/shared/constants/permission.constants';
 
 const colorByType: Record<string, 'default' | 'primary' | 'secondary' | 'success' | 'info' | 'warning'> = {
   MENU: 'primary',
+  PAGE: 'info',
   API: 'secondary',
   BUTTON: 'success',
   ACTION: 'warning',

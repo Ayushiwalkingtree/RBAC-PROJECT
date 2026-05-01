@@ -1,5 +1,6 @@
 export const RESOURCE_TYPES = {
   menu: 'MENU',
+  page: 'PAGE',
   api: 'API',
   button: 'BUTTON',
   action: 'ACTION',
@@ -20,6 +21,75 @@ export const PERMISSION_KEYS = {
   reject: 'REJECT',
   configure: 'CONFIGURE',
 } as const;
+
+export const RESOURCE_TYPE_LABELS: Record<string, string> = {
+  MENU: 'Menu',
+  PAGE: 'Page',
+  API: 'API',
+  BUTTON: 'Button',
+  ACTION: 'Action',
+  REPORT: 'Report',
+  DASHBOARD: 'Dashboard',
+};
+
+export const ADMIN_RESOURCE_TYPES = [
+  RESOURCE_TYPES.menu,
+  RESOURCE_TYPES.page,
+  RESOURCE_TYPES.button,
+  RESOURCE_TYPES.report,
+  RESOURCE_TYPES.dashboard,
+  RESOURCE_TYPES.action,
+] as const;
+
+export const RESOURCE_GROUP_OPTIONS = [
+  'Dashboard',
+  'User Management',
+  'Role Management',
+  'Reports',
+  'Tickets',
+  'Settings',
+  'Admin',
+] as const;
+
+export const ACTION_LABELS: Record<string, string> = {
+  VIEW: 'View',
+  READ: 'Read',
+  CREATE: 'Create',
+  UPDATE: 'Edit',
+  DELETE: 'Delete',
+  EXPORT: 'Export',
+  DOWNLOAD: 'Download',
+  APPROVE: 'Approve',
+  REJECT: 'Reject',
+  ASSIGN: 'Assign',
+  CONFIGURE: 'Configure',
+  EXECUTE: 'Execute',
+};
+
+export const ADMIN_ACTION_OPTIONS = [
+  PERMISSION_KEYS.view,
+  PERMISSION_KEYS.read,
+  PERMISSION_KEYS.create,
+  PERMISSION_KEYS.update,
+  PERMISSION_KEYS.delete,
+  PERMISSION_KEYS.export,
+  PERMISSION_KEYS.download,
+  PERMISSION_KEYS.approve,
+  PERMISSION_KEYS.reject,
+  'ASSIGN',
+  PERMISSION_KEYS.configure,
+  PERMISSION_KEYS.execute,
+] as const;
+
+export const DEFAULT_ACTIONS_BY_RESOURCE_TYPE: Record<string, string[]> = {
+  MENU: [PERMISSION_KEYS.view],
+  PAGE: [PERMISSION_KEYS.view, PERMISSION_KEYS.read],
+  BUTTON: [PERMISSION_KEYS.view],
+  REPORT: [PERMISSION_KEYS.view, PERMISSION_KEYS.download],
+  DASHBOARD: [PERMISSION_KEYS.view],
+  ACTION: [PERMISSION_KEYS.execute],
+  API: [PERMISSION_KEYS.execute],
+};
 
 export const RESOURCE_KEYS = {
   userMenu: 'USER_MENU',
@@ -45,6 +115,7 @@ export const RESOURCE_KEYS = {
   reportsMenu: 'REPORTS_MENU',
   reportDaily: 'REPORT_DAILY',
   reportMonthly: 'REPORT_MONTHLY',
+  reportAudit: 'REPORT_AUDIT',
   adminMenu: 'ADMIN_MENU',
   permissionsMenu: 'PERMISSIONS_MENU',
   roleManageApi: 'ROLE_MANAGE_API',

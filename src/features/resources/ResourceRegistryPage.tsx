@@ -43,6 +43,10 @@ export const ResourceRegistryPage = () => {
 
   const selectedResource = resources.find((resource) => resource.id === selectedResourceId) ?? resources[0];
   const canManage = canManageResources(can, session?.org.code);
+  const showAdvancedDetails = session?.org.code === 'PLATFORM';
+  const parentResources = resources.filter(
+    (resource) => resource.resourceType === RESOURCE_TYPES.menu && resource.isActive,
+  );
 
   const filteredResources = useMemo(
     () => resources.filter((resource) => typeFilter === 'ALL' || resource.resourceType === typeFilter),
@@ -206,14 +210,15 @@ export const ResourceRegistryPage = () => {
               <Divider />
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>
                 {[
-                  ['Resource key', selectedResource.resourceKey],
-                  ['Group', selectedResource.resourceGroup],
-                  ['Sequence', selectedResource.sequenceNo ?? 'None'],
-                  ['Parent', selectedResource.parentResourceKey ?? 'None'],
-                  ['HTTP method', selectedResource.httpMethod ?? 'None'],
-                  ['API path', selectedResource.apiPath ?? 'None'],
-                  ['Microservice', selectedResource.microservice ?? 'None'],
+                  ['Module', selectedResource.displayCategory ?? selectedResource.resourceGroup],
+                  ['Type', selectedResource.resourceType],
+                  ['Sort order', selectedResource.sequenceNo ?? 'None'],
+                  [
+                    'Parent menu',
+                    resources.find((resource) => resource.resourceKey === selectedResource.parentResourceKey)?.resourceName ?? 'Top level',
+                  ],
                   ['UI visible', selectedResource.isUiVisible ? 'Yes' : 'No'],
+                  ['Active', selectedResource.isActive ? 'Yes' : 'No'],
                 ].map(([label, value]) => (
                   <Box key={label}>
                     <Typography variant="caption" color="text.secondary">{label}</Typography>
@@ -221,6 +226,25 @@ export const ResourceRegistryPage = () => {
                   </Box>
                 ))}
               </Box>
+              {showAdvancedDetails && (
+                <>
+                  <Divider />
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>
+                    {[
+                      ['Resource key', selectedResource.resourceKey],
+                      ['Parent resource key', selectedResource.parentResourceKey ?? 'None'],
+                      ['HTTP method', selectedResource.httpMethod ?? 'None'],
+                      ['API path', selectedResource.apiPath ?? 'None'],
+                      ['Microservice', selectedResource.microservice ?? 'None'],
+                    ].map(([label, value]) => (
+                      <Box key={label}>
+                        <Typography variant="caption" color="text.secondary">{label}</Typography>
+                        <Typography variant="body2" fontWeight={800}>{value}</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </>
+              )}
               <Divider />
               <Box>
                 <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>Allowed permissions</Typography>
@@ -245,6 +269,8 @@ export const ResourceRegistryPage = () => {
         <ResourceForm
           initialValues={editingResource ? valuesFromResource(editingResource) : emptyResourceFormValues}
           loading={isSubmitting}
+          parentResources={parentResources}
+          showAdvanced={showAdvancedDetails}
           onCancel={closeForm}
           onSubmit={handleSubmit}
         />

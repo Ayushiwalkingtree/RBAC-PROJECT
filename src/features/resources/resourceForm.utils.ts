@@ -1,35 +1,85 @@
-import { RESOURCE_TYPES } from '@/shared/constants/permission.constants';
+import {
+  ACTION_LABELS,
+  DEFAULT_ACTIONS_BY_RESOURCE_TYPE,
+  PERMISSION_KEYS,
+  RESOURCE_GROUP_OPTIONS,
+  RESOURCE_TYPES,
+} from '@/shared/constants/permission.constants';
 import type { ResourceFormValues } from '@/features/resources/resource.schema';
 import type { ResourceRecord } from '@/shared/types/rbac.types';
+
+export const createResourceKey = (
+  _moduleName: string,
+  resourceName: string,
+  resourceType: string,
+): string => {
+  const words = resourceName
+    .replace(/management/giu, '')
+    .replace(/[^a-z0-9]+/giu, ' ')
+    .trim()
+    .split(/\s+/u)
+    .filter(Boolean);
+  const base = [...new Set(words.map((word) => word.toUpperCase()))].join('_');
+
+  if (resourceType === RESOURCE_TYPES.menu) return `${base}_MENU`;
+  if (resourceType === RESOURCE_TYPES.button) return `${base}_BTN`;
+  if (resourceType === RESOURCE_TYPES.action) return `${base}_ACTION`;
+  return base;
+};
+
+export const toPermissionDefinitions = (actions: string[]) =>
+  actions.map((action) => ({
+    key: action,
+    label: ACTION_LABELS[action] ?? action,
+  }));
 
 export const emptyResourceFormValues: ResourceFormValues = {
   resource_key: '',
   resource_name: '',
   resource_type: RESOURCE_TYPES.menu,
-  resource_group: '',
+  resource_group: RESOURCE_GROUP_OPTIONS[0],
   description: '',
   sequence_no: undefined,
   parent_resource_key: '',
-  http_method: undefined,
+  http_method: '',
   api_path: '',
   microservice: '',
   is_ui_visible: true,
   is_active: true,
-  allowed_permissions: [{ key: 'VIEW', label: 'View' }],
+  allowed_permissions: toPermissionDefinitions(DEFAULT_ACTIONS_BY_RESOURCE_TYPE.MENU),
 };
 
 export const valuesFromResource = (resource: ResourceRecord): ResourceFormValues => ({
   resource_key: resource.resourceKey,
-  resource_name: resource.resourceName,
-  resource_type: resource.resourceType,
-  resource_group: resource.resourceGroup,
+  resource_name: resource.displayName ?? resource.resourceName,
+  resource_type:
+    resource.resourceType === RESOURCE_TYPES.api ? RESOURCE_TYPES.action : resource.resourceType,
+  resource_group: resource.displayCategory ?? resource.resourceGroup,
   description: resource.description,
   sequence_no: resource.sequenceNo,
   parent_resource_key: resource.parentResourceKey ?? '',
-  http_method: resource.httpMethod,
+  http_method: resource.httpMethod ?? '',
   api_path: resource.apiPath ?? '',
   microservice: resource.microservice ?? '',
   is_ui_visible: resource.isUiVisible,
   is_active: resource.isActive,
-  allowed_permissions: resource.allowedPermissions,
+  allowed_permissions: resource.allowedPermissions.length
+    ? resource.allowedPermissions
+    : toPermissionDefinitions([PERMISSION_KEYS.view]),
 });
+
+export const normalizeResourceFormValues = (values: ResourceFormValues): ResourceFormValues => {
+  const resourceKey =
+    values.resource_key?.trim() ||
+    createResourceKey(values.resource_group, values.resource_name, values.resource_type);
+
+  return {
+    ...values,
+    resource_key: resourceKey,
+    description: values.description?.trim() || `${values.resource_name.trim()} access`,
+    allowed_permissions: values.allowed_permissions.map((permission) => ({
+      key: permission.key.toUpperCase(),
+      label: ACTION_LABELS[permission.key.toUpperCase()] ?? permission.key,
+    })),
+  };
+};

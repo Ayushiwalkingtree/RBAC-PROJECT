@@ -1,6 +1,7 @@
 import { mockDbService } from '@/mock/services/mockDb.service';
 import { createId } from '@/shared/utils/id';
 import type { ResourceFormValues } from '@/features/resources/resource.schema';
+import { normalizeResourceFormValues } from '@/features/resources/resourceForm.utils';
 import type { ResourceRecord } from '@/shared/types/rbac.types';
 
 const normalizeKey = (value: string): string => value.trim().toUpperCase();
@@ -17,26 +18,29 @@ const routeForResourceKey = (resourceKey: string): string | undefined => {
 };
 
 const toResourceRecord = (values: ResourceFormValues, existing?: ResourceRecord): ResourceRecord => {
-  const resourceKey = normalizeKey(values.resource_key);
+  const normalizedValues = normalizeResourceFormValues(values);
+  const resourceKey = normalizeKey(normalizedValues.resource_key ?? '');
 
   return {
     id: existing?.id ?? createId('res'),
     resourceKey,
-    resourceName: values.resource_name.trim(),
-    resourceType: values.resource_type,
-    resourceGroup: values.resource_group.trim(),
-    description: values.description.trim(),
-    allowedPermissions: values.allowed_permissions.map((permission) => ({
+    resourceName: normalizedValues.resource_name.trim(),
+    resourceType: normalizedValues.resource_type,
+    resourceGroup: normalizedValues.resource_group.trim(),
+    description: normalizedValues.description?.trim() || `${normalizedValues.resource_name.trim()} access`,
+    displayName: normalizedValues.resource_name.trim(),
+    displayCategory: normalizedValues.resource_group.trim(),
+    allowedPermissions: normalizedValues.allowed_permissions.map((permission) => ({
       key: normalizeKey(permission.key),
       label: permission.label.trim(),
     })),
-    sequenceNo: values.sequence_no,
-    parentResourceKey: values.parent_resource_key ? normalizeKey(values.parent_resource_key) : undefined,
-    httpMethod: values.http_method || undefined,
-    apiPath: values.api_path?.trim() || undefined,
-    microservice: values.microservice?.trim() || undefined,
-    isUiVisible: values.is_ui_visible,
-    isActive: values.is_active,
+    sequenceNo: normalizedValues.sequence_no,
+    parentResourceKey: normalizedValues.parent_resource_key ? normalizeKey(normalizedValues.parent_resource_key) : undefined,
+    httpMethod: normalizedValues.http_method || undefined,
+    apiPath: normalizedValues.api_path?.trim() || undefined,
+    microservice: normalizedValues.microservice?.trim() || undefined,
+    isUiVisible: normalizedValues.is_ui_visible,
+    isActive: normalizedValues.is_active,
     uiPath: existing?.uiPath ?? routeForResourceKey(resourceKey),
     icon: existing?.icon,
   };
@@ -51,7 +55,7 @@ export const resourceService = {
   createResource: async (values: ResourceFormValues): Promise<ResourceRecord> => {
     let createdResource: ResourceRecord | null = null;
     await mockDbService.updateDatabase((database) => {
-      const resourceKey = normalizeKey(values.resource_key);
+      const resourceKey = normalizeKey(normalizeResourceFormValues(values).resource_key ?? '');
       const duplicate = database.resources.some((resource) => resource.resourceKey === resourceKey);
       if (duplicate) {
         throw new Error('Resource key already exists.');
@@ -71,7 +75,7 @@ export const resourceService = {
   updateResource: async (resourceId: string, values: ResourceFormValues): Promise<ResourceRecord> => {
     let updatedResource: ResourceRecord | null = null;
     await mockDbService.updateDatabase((database) => {
-      const resourceKey = normalizeKey(values.resource_key);
+      const resourceKey = normalizeKey(normalizeResourceFormValues(values).resource_key ?? '');
       const duplicate = database.resources.some(
         (resource) => resource.id !== resourceId && resource.resourceKey === resourceKey,
       );
