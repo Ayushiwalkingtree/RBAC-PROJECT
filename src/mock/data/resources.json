@@ -295,6 +295,24 @@
     "icon": "reports"
   },
   {
+    "id": "res-report-audit",
+    "resourceKey": "REPORT_AUDIT",
+    "resourceName": "Audit Report",
+    "resourceType": "REPORT",
+    "resourceGroup": "Reports",
+    "description": "Audit activity report",
+    "allowedPermissions": [
+      { "key": "VIEW", "label": "View" },
+      { "key": "DOWNLOAD", "label": "Download" }
+    ],
+    "sequenceNo": 43,
+    "parentResourceKey": "REPORTS_MENU",
+    "isUiVisible": true,
+    "isActive": true,
+    "uiPath": "/reports",
+    "icon": "reports"
+  },
+  {
     "id": "res-admin-menu",
     "resourceKey": "ADMIN_MENU",
     "resourceName": "Roles",

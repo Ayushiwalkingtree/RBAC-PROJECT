@@ -1,7 +1,20 @@
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import { Box, Chip, Divider, IconButton, MenuItem, Paper, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import {
+  Box,
+  Chip,
+  Divider,
+  FormControlLabel,
+  IconButton,
+  MenuItem,
+  Paper,
+  Stack,
+  Switch,
+  TextField,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { AppButton } from '@/shared/components/AppButton';
 import { AppDialog } from '@/shared/components/AppDialog';
@@ -9,7 +22,6 @@ import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { PermissionChip } from '@/shared/components/PermissionChip';
-import { ResourceTypeBadge } from '@/shared/components/ResourceTypeBadge';
 import { useToast } from '@/shared/components/useToast';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { ResourceForm } from '@/features/resources/ResourceForm';
@@ -17,6 +29,12 @@ import { emptyResourceFormValues, valuesFromResource } from '@/features/resource
 import { resourceService } from '@/features/resources/resource.service';
 import { PERMISSION_KEYS, RESOURCE_KEYS, RESOURCE_TYPES } from '@/shared/constants/permission.constants';
 import { usePermission } from '@/shared/hooks/usePermission';
+import {
+  buildBusinessPermissionRows,
+  buildTechnicalPermissionRows,
+  getTechnicalSummary,
+} from '@/shared/adapters/rbacDisplay.adapter';
+import type { BusinessPermissionRow } from '@/shared/adapters/rbacDisplay.adapter';
 import type { ResourceFormValues } from '@/features/resources/resource.schema';
 import type { ResourceRecord } from '@/shared/types/rbac.types';
 
@@ -34,38 +52,45 @@ export const ResourceRegistryPage = () => {
   const { can } = usePermission();
   const { showToast } = useToast();
   const [resources, setResources] = useState<ResourceRecord[]>([]);
-  const [selectedResourceId, setSelectedResourceId] = useState('');
+  const [selectedRowId, setSelectedRowId] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
+  const [showTechnicalResources, setShowTechnicalResources] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<ResourceRecord | null>(null);
   const [deletingResource, setDeletingResource] = useState<ResourceRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const selectedResource = resources.find((resource) => resource.id === selectedResourceId) ?? resources[0];
   const canManage = canManageResources(can, session?.org.code);
-  const showAdvancedDetails = session?.org.code === 'PLATFORM';
+  const isPlatform = session?.org.code === 'PLATFORM';
   const parentResources = resources.filter(
     (resource) => resource.resourceType === RESOURCE_TYPES.menu && resource.isActive,
   );
-
-  const filteredResources = useMemo(
-    () => resources.filter((resource) => typeFilter === 'ALL' || resource.resourceType === typeFilter),
-    [resources, typeFilter],
-  );
-
-  const groupedResources = useMemo(
+  const businessRows = useMemo(() => buildBusinessPermissionRows(resources), [resources]);
+  const technicalRows = useMemo(() => buildTechnicalPermissionRows(resources), [resources]);
+  const registryRows = useMemo(
     () =>
-      filteredResources.reduce<Record<string, ResourceRecord[]>>((groups, resource) => ({
+      (showTechnicalResources ? technicalRows : businessRows).filter(
+        (row) => !showTechnicalResources || typeFilter === 'ALL' || row.displayType === typeFilter,
+      ),
+    [businessRows, showTechnicalResources, technicalRows, typeFilter],
+  );
+  const selectedRow = registryRows.find((row) => row.id === selectedRowId) ?? registryRows[0];
+  const primaryResource = selectedRow
+    ? resources.find((resource) => resource.resourceKey === selectedRow.technicalResourceKeys[0])
+    : undefined;
+
+  const groupedRows = useMemo(
+    () =>
+      registryRows.reduce<Record<string, BusinessPermissionRow[]>>((groups, row) => ({
         ...groups,
-        [resource.resourceGroup]: [...(groups[resource.resourceGroup] ?? []), resource],
+        [row.displayGroup]: [...(groups[row.displayGroup] ?? []), row],
       }), {}),
-    [filteredResources],
+    [registryRows],
   );
 
   const loadResources = async () => {
     const nextResources = await resourceService.listResources();
     setResources(nextResources);
-    setSelectedResourceId((current) => current || nextResources[0]?.id || '');
   };
 
   useEffect(() => {
@@ -95,7 +120,7 @@ export const ResourceRegistryPage = () => {
         showToast('Resource updated.');
       } else {
         const created = await resourceService.createResource(values);
-        setSelectedResourceId(created.id);
+        setSelectedRowId(showTechnicalResources ? `technical-${created.resourceKey}` : `resource-${created.resourceKey}`);
         showToast('Resource created.');
       }
 
@@ -115,7 +140,7 @@ export const ResourceRegistryPage = () => {
     setIsSubmitting(true);
     try {
       await resourceService.deleteResource(deletingResource.id);
-      setSelectedResourceId('');
+      setSelectedRowId('');
       await loadResources();
       await refreshSession();
       showToast('Resource deleted and removed from role grants.');
@@ -129,46 +154,76 @@ export const ResourceRegistryPage = () => {
 
   return (
     <>
-      <PageHeader title="Resource Registry" subtitle="Define menus, APIs, buttons, actions, reports, and dashboards.">
-        {canManage && (
-          <AppButton startIcon={<AddIcon />} onClick={openCreate}>
-            Create Resource
-          </AppButton>
-        )}
+      <PageHeader title="Resource Registry" subtitle="Manage business features and their available actions.">
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
+          {isPlatform && (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showTechnicalResources}
+                  onChange={(_, checked) => {
+                    setShowTechnicalResources(checked);
+                    setSelectedRowId('');
+                  }}
+                />
+              }
+              label="Show technical resources"
+            />
+          )}
+          {canManage && (
+            <AppButton startIcon={<AddIcon />} onClick={openCreate}>
+              Create Resource
+            </AppButton>
+          )}
+        </Stack>
       </PageHeader>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '360px 1fr' }, gap: 2 }}>
         <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2, minHeight: 560 }}>
-          <TextField select label="Resource type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} fullWidth sx={{ mb: 2 }}>
-            <MenuItem value="ALL">All types</MenuItem>
-            {Object.values(RESOURCE_TYPES).map((type) => <MenuItem key={type} value={type}>{type}</MenuItem>)}
-          </TextField>
+          {showTechnicalResources && (
+            <TextField
+              select
+              label="Resource type"
+              value={typeFilter}
+              onChange={(event) => setTypeFilter(event.target.value)}
+              fullWidth
+              sx={{ mb: 2 }}
+            >
+              <MenuItem value="ALL">All types</MenuItem>
+              {Object.values(RESOURCE_TYPES).map((type) => (
+                <MenuItem key={type} value={type}>{type}</MenuItem>
+              ))}
+            </TextField>
+          )}
+
           <Stack spacing={2}>
-            {Object.entries(groupedResources).map(([group, groupResources]) => (
+            {Object.entries(groupedRows).map(([group, rows]) => (
               <Box key={group}>
                 <Typography variant="overline" color="text.secondary">{group}</Typography>
                 <Stack spacing={0.75}>
-                  {groupResources.map((resource) => (
+                  {rows.map((row) => (
                     <Paper
-                      key={resource.id}
+                      key={row.id}
                       elevation={0}
-                      onClick={() => setSelectedResourceId(resource.id)}
+                      onClick={() => setSelectedRowId(row.id)}
                       sx={{
                         p: 1.25,
                         cursor: 'pointer',
                         border: 1,
-                        borderColor: selectedResource?.id === resource.id ? 'primary.main' : 'divider',
-                        bgcolor: selectedResource?.id === resource.id ? 'action.selected' : 'background.paper',
+                        borderColor: selectedRow?.id === row.id ? 'primary.main' : 'divider',
+                        bgcolor: selectedRow?.id === row.id ? 'action.selected' : 'background.paper',
                         transition: 'transform 160ms ease, border-color 160ms ease',
                         '&:hover': { transform: 'translateY(-1px)', borderColor: 'primary.main' },
                       }}
                     >
                       <Stack direction="row" justifyContent="space-between" spacing={1}>
                         <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="body2" fontWeight={800} noWrap>{resource.resourceName}</Typography>
-                          <Typography variant="caption" color="text.secondary" noWrap display="block">{resource.resourceKey}</Typography>
+                          <Typography variant="body2" fontWeight={800} noWrap>{row.displayName}</Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap display="block">
+                            {row.description}
+                          </Typography>
                         </Box>
-                        <ResourceTypeBadge type={resource.resourceType} />
+                        <Chip label={row.displayType} size="small" variant="outlined" />
                       </Stack>
                     </Paper>
                   ))}
@@ -179,28 +234,28 @@ export const ResourceRegistryPage = () => {
         </Paper>
 
         <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2, minHeight: 560 }}>
-          {!selectedResource ? (
-            <EmptyState title="No resource selected" description="Choose a resource to view its registry detail." />
+          {!selectedRow ? (
+            <EmptyState title="No resource selected" description="Choose a feature to view its available actions." />
           ) : (
             <Stack spacing={2}>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
                 <Box>
                   <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                    <Typography variant="h5">{selectedResource.resourceName}</Typography>
-                    <ResourceTypeBadge type={selectedResource.resourceType} />
-                    {!selectedResource.isActive && <Chip label="Inactive" size="small" color="warning" />}
+                    <Typography variant="h5">{selectedRow.displayName}</Typography>
+                    <Chip label={selectedRow.displayType} size="small" variant="outlined" />
+                    {primaryResource && !primaryResource.isActive && <Chip label="Inactive" size="small" color="warning" />}
                   </Stack>
-                  <Typography variant="body2" color="text.secondary">{selectedResource.description}</Typography>
+                  <Typography variant="body2" color="text.secondary">{selectedRow.description}</Typography>
                 </Box>
-                {canManage && (
+                {canManage && primaryResource && (showTechnicalResources || selectedRow.technicalResourceKeys.length === 1) && (
                   <Stack direction="row" spacing={1}>
                     <Tooltip title="Edit resource">
-                      <IconButton onClick={() => openEdit(selectedResource)} aria-label="Edit resource">
+                      <IconButton onClick={() => openEdit(primaryResource)} aria-label="Edit resource">
                         <EditIcon />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Delete resource">
-                      <IconButton color="error" onClick={() => setDeletingResource(selectedResource)} aria-label="Delete resource">
+                      <IconButton color="error" onClick={() => setDeletingResource(primaryResource)} aria-label="Delete resource">
                         <DeleteIcon />
                       </IconButton>
                     </Tooltip>
@@ -210,15 +265,15 @@ export const ResourceRegistryPage = () => {
               <Divider />
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>
                 {[
-                  ['Module', selectedResource.displayCategory ?? selectedResource.resourceGroup],
-                  ['Type', selectedResource.resourceType],
-                  ['Sort order', selectedResource.sequenceNo ?? 'None'],
+                  ['Module', selectedRow.displayGroup],
+                  ['Type', selectedRow.displayType],
+                  ['Sort order', primaryResource?.sequenceNo ?? 'None'],
                   [
                     'Parent menu',
-                    resources.find((resource) => resource.resourceKey === selectedResource.parentResourceKey)?.resourceName ?? 'Top level',
+                    resources.find((resource) => resource.resourceKey === primaryResource?.parentResourceKey)?.resourceName ?? 'Top level',
                   ],
-                  ['UI visible', selectedResource.isUiVisible ? 'Yes' : 'No'],
-                  ['Active', selectedResource.isActive ? 'Yes' : 'No'],
+                  ['UI visible', primaryResource?.isUiVisible ? 'Yes' : 'No'],
+                  ['Active', primaryResource?.isActive ? 'Yes' : 'No'],
                 ].map(([label, value]) => (
                   <Box key={label}>
                     <Typography variant="caption" color="text.secondary">{label}</Typography>
@@ -226,31 +281,23 @@ export const ResourceRegistryPage = () => {
                   </Box>
                 ))}
               </Box>
-              {showAdvancedDetails && (
+              {isPlatform && showTechnicalResources && (
                 <>
                   <Divider />
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>
-                    {[
-                      ['Resource key', selectedResource.resourceKey],
-                      ['Parent resource key', selectedResource.parentResourceKey ?? 'None'],
-                      ['HTTP method', selectedResource.httpMethod ?? 'None'],
-                      ['API path', selectedResource.apiPath ?? 'None'],
-                      ['Microservice', selectedResource.microservice ?? 'None'],
-                    ].map(([label, value]) => (
-                      <Box key={label}>
-                        <Typography variant="caption" color="text.secondary">{label}</Typography>
-                        <Typography variant="body2" fontWeight={800}>{value}</Typography>
-                      </Box>
-                    ))}
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={900} sx={{ mb: 1 }}>Technical details</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {getTechnicalSummary(resources, selectedRow.technicalResourceKeys)}
+                    </Typography>
                   </Box>
                 </>
               )}
               <Divider />
               <Box>
-                <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>Allowed permissions</Typography>
+                <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>Actions</Typography>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                  {selectedResource.allowedPermissions.map((permission) => (
-                    <PermissionChip key={permission.key} label={`${permission.key} · ${permission.label}`} selected />
+                  {selectedRow.actions.map((permission) => (
+                    <PermissionChip key={permission.id} label={permission.label} selected />
                   ))}
                 </Stack>
               </Box>
@@ -262,7 +309,7 @@ export const ResourceRegistryPage = () => {
       <AppDialog
         open={formOpen}
         title={editingResource ? 'Edit resource' : 'Create resource'}
-        helperText="Each resource owns the permission keys that roles may grant."
+        helperText="Create a business feature and choose the actions that roles may receive."
         onClose={closeForm}
         maxWidth="md"
       >
@@ -270,7 +317,7 @@ export const ResourceRegistryPage = () => {
           initialValues={editingResource ? valuesFromResource(editingResource) : emptyResourceFormValues}
           loading={isSubmitting}
           parentResources={parentResources}
-          showAdvanced={showAdvancedDetails}
+          showAdvanced={isPlatform}
           onCancel={closeForm}
           onSubmit={handleSubmit}
         />

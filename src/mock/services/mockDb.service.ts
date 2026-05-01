@@ -108,6 +108,7 @@ const normalizeDatabase = (database: MockDatabase): MockDatabase => {
     [RESOURCE_KEYS.reportsMenu]: [PERMISSION_KEYS.view],
     [RESOURCE_KEYS.reportDaily]: [PERMISSION_KEYS.view, PERMISSION_KEYS.download],
     [RESOURCE_KEYS.reportMonthly]: [PERMISSION_KEYS.view, PERMISSION_KEYS.download],
+    [RESOURCE_KEYS.reportAudit]: [PERMISSION_KEYS.view, PERMISSION_KEYS.download],
   };
 
   return {

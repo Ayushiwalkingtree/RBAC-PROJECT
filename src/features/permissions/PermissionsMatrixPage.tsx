@@ -8,11 +8,16 @@ import { AppButton } from '@/shared/components/AppButton';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { PermissionChip } from '@/shared/components/PermissionChip';
-import { ResourceTypeBadge } from '@/shared/components/ResourceTypeBadge';
 import { useToast } from '@/shared/components/useToast';
 import { PERMISSION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
 import { usePermission } from '@/shared/hooks/usePermission';
-import { buildDisplayPermissionRows } from '@/shared/utils/rbacDisplay.adapter';
+import {
+  applyBusinessActionToggle,
+  buildBusinessPermissionRows,
+  getTechnicalSummary,
+  isBusinessActionSelected,
+} from '@/shared/adapters/rbacDisplay.adapter';
+import type { BusinessPermissionAction } from '@/shared/adapters/rbacDisplay.adapter';
 import type { ResourceRecord, Role, RolePermissionGrants } from '@/shared/types/rbac.types';
 
 const countGrants = (permissions: RolePermissionGrants): number =>
@@ -33,7 +38,7 @@ export const PermissionsMatrixPage = () => {
   const canConfigure = can(RESOURCE_KEYS.permissionGrantApi, PERMISSION_KEYS.configure);
   const selectedRole = roles.find((role) => role.id === selectedRoleId);
 
-  const displayRows = useMemo(() => buildDisplayPermissionRows(resources), [resources]);
+  const displayRows = useMemo(() => buildBusinessPermissionRows(resources), [resources]);
   const groupedRows = useMemo(
     () =>
       displayRows.reduce<Record<string, typeof displayRows>>((groups, row) => ({
@@ -67,20 +72,10 @@ export const PermissionsMatrixPage = () => {
     setIsDirty(false);
   };
 
-  const toggleGrant = (resourceKey: string, permissionKey: string) => {
+  const toggleGrant = (action: BusinessPermissionAction) => {
     if (!canConfigure) return;
 
-    setDraftPermissions((current) => {
-      const currentPermissions = current[resourceKey] ?? [];
-      const nextPermissions = currentPermissions.includes(permissionKey)
-        ? currentPermissions.filter((permission) => permission !== permissionKey)
-        : [...currentPermissions, permissionKey];
-      const next = { ...current, [resourceKey]: nextPermissions };
-      if (nextPermissions.length === 0) {
-        delete next[resourceKey];
-      }
-      return next;
-    });
+    setDraftPermissions((current) => applyBusinessActionToggle(current, action));
     setIsDirty(true);
   };
 
@@ -166,20 +161,20 @@ export const PermissionsMatrixPage = () => {
                         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
                           <Box>
                             <Stack direction="row" spacing={1} alignItems="center">
-                              <Tooltip title={row.technicalSummary}>
+                              <Tooltip title={getTechnicalSummary(resources, row.technicalResourceKeys)}>
                                 <Typography variant="subtitle2" fontWeight={900}>{row.displayName}</Typography>
                               </Tooltip>
-                              <ResourceTypeBadge type={row.resourceType} />
+                              <Chip label={row.displayType} size="small" variant="outlined" />
                             </Stack>
-                            <Typography variant="caption" color="text.secondary">Technical details available on hover</Typography>
+                            <Typography variant="caption" color="text.secondary">{row.description}</Typography>
                           </Box>
                           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                            {row.displayActions.map((permission) => (
+                            {row.actions.map((permission) => (
                               <PermissionChip
-                                key={`${permission.internalResourceKey}-${permission.internalPermissionKey}`}
+                                key={permission.id}
                                 label={permission.label}
-                                selected={(draftPermissions[permission.internalResourceKey] ?? []).includes(permission.internalPermissionKey)}
-                                onClick={() => toggleGrant(permission.internalResourceKey, permission.internalPermissionKey)}
+                                selected={isBusinessActionSelected(draftPermissions, permission)}
+                                onClick={() => toggleGrant(permission)}
                               />
                             ))}
                           </Stack>
