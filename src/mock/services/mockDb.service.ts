@@ -1,6 +1,4 @@
-import navigationData from '@/mock/data/navigation.json';
 import organizationsData from '@/mock/data/organizations.json';
-import permissionsData from '@/mock/data/permissions.json';
 import reportsData from '@/mock/data/reports.json';
 import resourcesData from '@/mock/data/resources.json';
 import rolesData from '@/mock/data/roles.json';
@@ -9,17 +7,14 @@ import ticketsData from '@/mock/data/tickets.json';
 import usersData from '@/mock/data/users.json';
 import { STORAGE_KEYS } from '@/shared/constants/storage.constants';
 import type { Organization, UserRecord } from '@/shared/types/auth.types';
-import type { NavigationItem } from '@/shared/types/navigation.types';
 import type { Report, TenantSetting, Ticket } from '@/shared/types/domain.types';
-import type { Permission, Resource, Role } from '@/shared/types/rbac.types';
+import type { ResourceRecord, Role } from '@/shared/types/rbac.types';
 
 export type MockDatabase = {
   organizations: Organization[];
   users: UserRecord[];
   roles: Role[];
-  permissions: Permission[];
-  resources: Resource[];
-  navigation: NavigationItem[];
+  resources: ResourceRecord[];
   tickets: Ticket[];
   reports: Report[];
   settings: TenantSetting[];
@@ -31,9 +26,7 @@ const createSeedDatabase = (): MockDatabase => ({
   organizations: organizationsData as Organization[],
   users: usersData as UserRecord[],
   roles: rolesData as Role[],
-  permissions: permissionsData as Permission[],
-  resources: resourcesData as Resource[],
-  navigation: navigationData as NavigationItem[],
+  resources: resourcesData as ResourceRecord[],
   tickets: ticketsData as Ticket[],
   reports: reportsData as Report[],
   settings: settingsData as TenantSetting[],

@@ -7,8 +7,8 @@ import { DataTable } from '@/shared/components/DataTable';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useToast } from '@/shared/components/useToast';
-import { PermissionGuard } from '@/shared/components/guards/PermissionGuard';
-import { ACTION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
+import { RESOURCE_PERMISSION_RULES } from '@/shared/constants/permission.constants';
+import { usePermission } from '@/shared/hooks/usePermission';
 import type { Report } from '@/shared/types/domain.types';
 
 const downloadCsv = (fileName: string, csv: string) => {
@@ -23,9 +23,13 @@ const downloadCsv = (fileName: string, csv: string) => {
 
 export const ReportsPage = () => {
   const session = useAuthStore((state) => state.session);
+  const { canAny } = usePermission();
   const { showToast } = useToast();
   const [reports, setReports] = useState<Report[]>([]);
   const [isExporting, setIsExporting] = useState(false);
+  const canDownloadReports =
+    canAny(RESOURCE_PERMISSION_RULES.reports.downloadDaily) ||
+    canAny(RESOURCE_PERMISSION_RULES.reports.downloadMonthly);
 
   const loadReports = async () => {
     if (!session) {
@@ -60,11 +64,11 @@ export const ReportsPage = () => {
   return (
     <>
       <PageHeader title="Reports" subtitle="Tenant analytics and export workflows.">
-        <PermissionGuard resource={RESOURCE_KEYS.reports} action={ACTION_KEYS.export}>
+        {canDownloadReports && (
           <AppButton startIcon={<FileDownloadIcon />} loading={isExporting} onClick={() => void handleExport()}>
             Export reports
           </AppButton>
-        </PermissionGuard>
+        )}
       </PageHeader>
 
       {reports.length === 0 ? (

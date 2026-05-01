@@ -1,5 +1,6 @@
 import { Button, CircularProgress } from '@mui/material';
 import type { ButtonProps } from '@mui/material';
+import { motion } from 'framer-motion';
 
 type AppButtonProps = ButtonProps & {
   loading?: boolean;
@@ -7,6 +8,9 @@ type AppButtonProps = ButtonProps & {
 
 export const AppButton = ({ loading = false, disabled, children, sx, ...props }: AppButtonProps) => (
   <Button
+    component={motion.button}
+    whileHover={disabled || loading ? undefined : { y: -1 }}
+    whileTap={disabled || loading ? undefined : { scale: 0.98 }}
     disabled={disabled || loading}
     sx={{
       transition: 'transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease',

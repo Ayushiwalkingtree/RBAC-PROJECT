@@ -1,10 +1,9 @@
 import { mockDbService } from '@/mock/services/mockDb.service';
-import type { Permission, Resource, Role } from '@/shared/types/rbac.types';
+import type { ResourceRecord, Role } from '@/shared/types/rbac.types';
 
 export type PermissionsMatrix = {
   roles: Role[];
-  permissions: Permission[];
-  resources: Resource[];
+  resources: ResourceRecord[];
 };
 
 export const permissionService = {
@@ -12,20 +11,27 @@ export const permissionService = {
     const database = await mockDbService.getDatabase();
     return {
       roles: database.roles.filter((role) => role.orgId === orgId),
-      permissions: database.permissions,
       resources: database.resources,
     };
   },
 
-  updateRolePermissions: async (roleId: string, permissionIds: string[]): Promise<Role> => {
+  updateRolePermissions: async (roleId: string, permissions: Role['permissions']): Promise<Role> => {
     let updatedRole: Role | null = null;
     await mockDbService.updateDatabase((database) => {
-      const availablePermissionIds = new Set(database.permissions.map((permission) => permission.id));
-      const invalidPermissionIds = permissionIds.filter((permissionId) => !availablePermissionIds.has(permissionId));
+      const resourcesByKey = new Map(database.resources.map((resource) => [resource.resourceKey, resource]));
 
-      if (invalidPermissionIds.length > 0) {
-        throw new Error('Only valid permission keys can be saved.');
-      }
+      Object.entries(permissions).forEach(([resourceKey, grantedPermissions]) => {
+        const resource = resourcesByKey.get(resourceKey);
+        if (!resource) {
+          throw new Error(`Unknown resource ${resourceKey}.`);
+        }
+
+        const allowed = new Set(resource.allowedPermissions.map((permission) => permission.key));
+        const invalidPermission = grantedPermissions.find((permission) => !allowed.has(permission));
+        if (invalidPermission) {
+          throw new Error(`${invalidPermission} is not allowed for ${resourceKey}.`);
+        }
+      });
 
       return {
         ...database,
@@ -34,7 +40,7 @@ export const permissionService = {
             return role;
           }
 
-          updatedRole = { ...role, permissionIds: [...new Set(permissionIds)] };
+          updatedRole = { ...role, permissions };
           return updatedRole;
         }),
       };

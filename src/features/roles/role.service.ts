@@ -34,7 +34,7 @@ export const roleService = {
         code: normalizeCode(input.role_code),
         name: input.role_name.trim(),
         description: input.description.trim(),
-        permissionIds: [],
+        permissions: {},
         isSystem: false,
       };
 

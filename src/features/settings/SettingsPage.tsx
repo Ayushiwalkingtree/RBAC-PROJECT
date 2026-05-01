@@ -19,7 +19,7 @@ import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useToast } from '@/shared/components/useToast';
 import { PermissionGuard } from '@/shared/components/guards/PermissionGuard';
-import { ACTION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
+import { PERMISSION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
 import { THEME_OPTIONS } from '@/shared/theme/theme.constants';
 import { useThemeStore } from '@/shared/theme/theme.store';
 import type { TenantSetting } from '@/shared/types/domain.types';
@@ -95,12 +95,12 @@ export const SettingsPage = () => {
     <>
       <PageHeader title="Settings" subtitle="Tenant configuration and local mock database controls.">
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-          <PermissionGuard resource={RESOURCE_KEYS.settings} action={ACTION_KEYS.manage}>
+          <PermissionGuard resource={RESOURCE_KEYS.settingsManageApi} permission={PERMISSION_KEYS.update}>
             <AppButton startIcon={<SaveIcon />} loading={isSaving} onClick={() => void handleSave()}>
               Save settings
             </AppButton>
           </PermissionGuard>
-          <PermissionGuard resource={RESOURCE_KEYS.settings} action={ACTION_KEYS.manage}>
+          <PermissionGuard resource={RESOURCE_KEYS.settingsManageApi} permission={PERMISSION_KEYS.update}>
             <AppButton color="error" startIcon={<RestartAltIcon />} onClick={() => setResetOpen(true)}>
               Reset Mock Data
             </AppButton>

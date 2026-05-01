@@ -4,15 +4,18 @@ import { LoginPage } from '@/features/auth/components/LoginPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { PermissionsMatrixPage } from '@/features/permissions/PermissionsMatrixPage';
 import { ReportsPage } from '@/features/reports/ReportsPage';
+import { ResourceRegistryPage } from '@/features/resources/ResourceRegistryPage';
 import { RolesPage } from '@/features/roles/RolesPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { TicketsPage } from '@/features/tickets/TicketsPage';
 import { UsersPage } from '@/features/users/UsersPage';
+import { NavPreviewPage } from '@/features/navPreview/NavPreviewPage';
 import { AppShell } from '@/shared/components/layout/AppShell';
 import { AuthGuard } from '@/shared/components/guards/AuthGuard';
 import { PermissionGuard } from '@/shared/components/guards/PermissionGuard';
 import { APP_CONFIG } from '@/shared/constants/app.constants';
 import { ROUTE_PERMISSIONS, ROUTES } from '@/shared/constants/route.constants';
+import { PERMISSION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
 
 const ShellRoute = () => (
   <AppShell>
@@ -26,7 +29,7 @@ const protectedElement = (path: keyof typeof ROUTE_PERMISSIONS, element: ReactEl
   return (
     <PermissionGuard
       resource={permission.resource}
-      action={permission.action}
+      permission={permission.permission}
       redirect
     >
       {element}
@@ -48,9 +51,27 @@ export const AppRouter = () => (
             path={ROUTES.permissions}
             element={protectedElement(ROUTES.permissions, <PermissionsMatrixPage />)}
           />
-          <Route path={ROUTES.tickets} element={protectedElement(ROUTES.tickets, <TicketsPage />)} />
+          <Route
+            path={ROUTES.tickets}
+            element={(
+              <PermissionGuard
+                anyOf={[
+                  { resource: RESOURCE_KEYS.loanMenu, permission: PERMISSION_KEYS.view },
+                  { resource: RESOURCE_KEYS.ticketMenu, permission: PERMISSION_KEYS.view },
+                ]}
+                redirect
+              >
+                <TicketsPage />
+              </PermissionGuard>
+            )}
+          />
           <Route path={ROUTES.reports} element={protectedElement(ROUTES.reports, <ReportsPage />)} />
           <Route path={ROUTES.settings} element={protectedElement(ROUTES.settings, <SettingsPage />)} />
+          <Route
+            path={ROUTES.resourceRegistry}
+            element={protectedElement(ROUTES.resourceRegistry, <ResourceRegistryPage />)}
+          />
+          <Route path={ROUTES.navPreview} element={protectedElement(ROUTES.navPreview, <NavPreviewPage />)} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to={APP_CONFIG.defaultRoute} replace />} />

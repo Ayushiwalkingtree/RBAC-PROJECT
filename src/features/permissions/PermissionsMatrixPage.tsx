@@ -1,15 +1,6 @@
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SaveIcon from '@mui/icons-material/Save';
-import {
-  Box,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Paper,
-  Select,
-  Stack,
-  Typography,
-} from '@mui/material';
-import type { SelectChangeEvent } from '@mui/material';
+import { Alert, Box, Chip, Divider, Paper, Stack, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { permissionService } from '@/features/permissions/permission.service';
@@ -17,49 +8,50 @@ import { AppButton } from '@/shared/components/AppButton';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { PermissionChip } from '@/shared/components/PermissionChip';
+import { ResourceTypeBadge } from '@/shared/components/ResourceTypeBadge';
 import { useToast } from '@/shared/components/useToast';
-import { PermissionGuard } from '@/shared/components/guards/PermissionGuard';
-import { ACTION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
-import type { Permission, Resource, Role } from '@/shared/types/rbac.types';
+import { PERMISSION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
+import { usePermission } from '@/shared/hooks/usePermission';
+import type { ResourceRecord, Role, RolePermissionGrants } from '@/shared/types/rbac.types';
+
+const countGrants = (permissions: RolePermissionGrants): number =>
+  Object.values(permissions).reduce((total, grants) => total + grants.length, 0);
 
 export const PermissionsMatrixPage = () => {
   const session = useAuthStore((state) => state.session);
   const refreshSession = useAuthStore((state) => state.refreshSession);
+  const { can } = usePermission();
   const { showToast } = useToast();
   const [roles, setRoles] = useState<Role[]>([]);
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [resources, setResources] = useState<ResourceRecord[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState('');
-  const [draftPermissionIds, setDraftPermissionIds] = useState<string[]>([]);
+  const [draftPermissions, setDraftPermissions] = useState<RolePermissionGrants>({});
+  const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const canConfigure = can(RESOURCE_KEYS.permissionGrantApi, PERMISSION_KEYS.configure);
   const selectedRole = roles.find((role) => role.id === selectedRoleId);
 
   const groupedResources = useMemo(
     () =>
-      resources.reduce<Record<string, Resource[]>>((groups, resource) => {
-        return {
-          ...groups,
-          [resource.group]: [...(groups[resource.group] ?? []), resource],
-        };
-      }, {}),
+      resources.reduce<Record<string, ResourceRecord[]>>((groups, resource) => ({
+        ...groups,
+        [resource.resourceGroup]: [...(groups[resource.resourceGroup] ?? []), resource],
+      }), {}),
     [resources],
   );
 
   const loadMatrix = async () => {
-    if (!session) {
-      return;
-    }
+    if (!session) return;
 
     const matrix = await permissionService.getRolePermissionsMatrix(session.org.id);
     setRoles(matrix.roles);
     setResources(matrix.resources);
-    setPermissions(matrix.permissions);
-
     const nextRoleId = selectedRoleId || matrix.roles[0]?.id || '';
     setSelectedRoleId(nextRoleId);
     const role = matrix.roles.find((candidate) => candidate.id === nextRoleId);
-    setDraftPermissionIds(role?.permissionIds ?? []);
+    setDraftPermissions(role?.permissions ?? {});
+    setIsDirty(false);
   };
 
   useEffect(() => {
@@ -67,29 +59,40 @@ export const PermissionsMatrixPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.org.id]);
 
-  const handleRoleChange = (event: SelectChangeEvent) => {
-    const roleId = event.target.value;
-    const role = roles.find((candidate) => candidate.id === roleId);
-    setSelectedRoleId(roleId);
-    setDraftPermissionIds(role?.permissionIds ?? []);
+  const selectRole = (role: Role) => {
+    setSelectedRoleId(role.id);
+    setDraftPermissions(role.permissions);
+    setIsDirty(false);
   };
 
-  const togglePermission = (permissionId: string) => {
-    setDraftPermissionIds((current) =>
-      current.includes(permissionId)
-        ? current.filter((id) => id !== permissionId)
-        : [...current, permissionId],
-    );
+  const toggleGrant = (resourceKey: string, permissionKey: string) => {
+    if (!canConfigure) return;
+
+    setDraftPermissions((current) => {
+      const currentPermissions = current[resourceKey] ?? [];
+      const nextPermissions = currentPermissions.includes(permissionKey)
+        ? currentPermissions.filter((permission) => permission !== permissionKey)
+        : [...currentPermissions, permissionKey];
+      const next = { ...current, [resourceKey]: nextPermissions };
+      if (nextPermissions.length === 0) {
+        delete next[resourceKey];
+      }
+      return next;
+    });
+    setIsDirty(true);
+  };
+
+  const discardChanges = () => {
+    setDraftPermissions(selectedRole?.permissions ?? {});
+    setIsDirty(false);
   };
 
   const handleSave = async () => {
-    if (!selectedRoleId) {
-      return;
-    }
+    if (!selectedRoleId) return;
 
     setIsSaving(true);
     try {
-      await permissionService.updateRolePermissions(selectedRoleId, draftPermissionIds);
+      await permissionService.updateRolePermissions(selectedRoleId, draftPermissions);
       await loadMatrix();
       await refreshSession();
       showToast('Permissions saved.');
@@ -102,75 +105,90 @@ export const PermissionsMatrixPage = () => {
 
   return (
     <>
-      <PageHeader title="Permissions Matrix" subtitle="Select a role and configure allowed resource actions.">
-        <PermissionGuard resource={RESOURCE_KEYS.permissions} action={ACTION_KEYS.assign}>
-          <AppButton startIcon={<SaveIcon />} loading={isSaving} onClick={() => void handleSave()}>
-            Save permissions
+      <PageHeader title="Permission Matrix" subtitle="Grant each role permissions on registered resources.">
+        <Stack direction="row" spacing={1}>
+          {isDirty && <Chip color="warning" label="Unsaved changes" />}
+          <AppButton variant="outlined" startIcon={<RestartAltIcon />} disabled={!isDirty} onClick={discardChanges}>
+            Discard
           </AppButton>
-        </PermissionGuard>
+          <AppButton startIcon={<SaveIcon />} loading={isSaving} disabled={!canConfigure || !isDirty} onClick={() => void handleSave()}>
+            Save
+          </AppButton>
+        </Stack>
       </PageHeader>
 
-      {roles.length === 0 ? (
-        <EmptyState title="No roles available" description="Create a role before assigning permissions." />
-      ) : (
-        <Stack spacing={2}>
-          <FormControl size="small" sx={{ maxWidth: 360 }}>
-            <InputLabel>Role</InputLabel>
-            <Select label="Role" value={selectedRoleId} onChange={handleRoleChange}>
-              {roles.map((role) => (
-                <MenuItem key={role.id} value={role.id}>
-                  {role.code} · {role.name}
-                </MenuItem>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '320px 1fr' }, gap: 2 }}>
+        <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2, minHeight: 620 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>Roles</Typography>
+          <Stack spacing={1}>
+            {roles.map((role) => (
+              <Paper
+                key={role.id}
+                elevation={0}
+                onClick={() => selectRole(role)}
+                sx={{
+                  p: 1.5,
+                  cursor: 'pointer',
+                  border: 1,
+                  borderColor: selectedRoleId === role.id ? 'primary.main' : 'divider',
+                  bgcolor: selectedRoleId === role.id ? 'action.selected' : 'background.paper',
+                  transition: 'transform 160ms ease, border-color 160ms ease',
+                  '&:hover': { transform: 'translateY(-1px)', borderColor: 'primary.main' },
+                }}
+              >
+                <Typography variant="body2" fontWeight={900}>{role.code}</Typography>
+                <Typography variant="caption" color="text.secondary">{role.name}</Typography>
+                <Typography variant="caption" display="block">{countGrants(role.permissions)} grants</Typography>
+              </Paper>
+            ))}
+          </Stack>
+        </Paper>
+
+        <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2, minHeight: 620 }}>
+          {!selectedRole ? (
+            <EmptyState title="No role selected" description="Select a role to configure permissions." />
+          ) : (
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="h5">{selectedRole.name}</Typography>
+                <Typography variant="body2" color="text.secondary">{selectedRole.description}</Typography>
+              </Box>
+              {!canConfigure && <Alert severity="info">You can view this matrix, but cannot configure grants.</Alert>}
+              <Divider />
+              {Object.entries(groupedResources).map(([group, groupResources]) => (
+                <Box key={group}>
+                  <Typography variant="h6" sx={{ mb: 1 }}>{group}</Typography>
+                  <Stack spacing={1.25}>
+                    {groupResources.map((resource) => (
+                      <Paper key={resource.id} elevation={0} sx={{ p: 1.5, border: 1, borderColor: 'divider' }}>
+                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
+                          <Box>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Typography variant="subtitle2" fontWeight={900}>{resource.resourceName}</Typography>
+                              <ResourceTypeBadge type={resource.resourceType} />
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary">{resource.resourceKey}</Typography>
+                          </Box>
+                          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                            {resource.allowedPermissions.map((permission) => (
+                              <PermissionChip
+                                key={`${resource.resourceKey}-${permission.key}`}
+                                label={permission.key}
+                                selected={(draftPermissions[resource.resourceKey] ?? []).includes(permission.key)}
+                                onClick={() => toggleGrant(resource.resourceKey, permission.key)}
+                              />
+                            ))}
+                          </Stack>
+                        </Stack>
+                      </Paper>
+                    ))}
+                  </Stack>
+                </Box>
               ))}
-            </Select>
-          </FormControl>
-
-          {selectedRole && (
-            <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2 }}>
-              <Typography variant="h6">{selectedRole.name}</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {selectedRole.description}
-              </Typography>
-            </Paper>
+            </Stack>
           )}
-
-          {Object.entries(groupedResources).map(([group, groupResources]) => (
-            <Paper key={group} elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>
-                {group}
-              </Typography>
-              <Stack spacing={2}>
-                {groupResources.map((resource) => {
-                  const resourcePermissions = permissions.filter(
-                    (permission) => permission.resource === resource.id,
-                  );
-
-                  return (
-                    <Box key={resource.id}>
-                      <Typography variant="subtitle1" fontWeight={800}>
-                        {resource.label}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        {resource.description}
-                      </Typography>
-                      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                        {resourcePermissions.map((permission) => (
-                          <PermissionChip
-                            key={permission.id}
-                            label={permission.action}
-                            selected={draftPermissionIds.includes(permission.id)}
-                            onClick={() => togglePermission(permission.id)}
-                          />
-                        ))}
-                      </Stack>
-                    </Box>
-                  );
-                })}
-              </Stack>
-            </Paper>
-          ))}
-        </Stack>
-      )}
+        </Paper>
+      </Box>
     </>
   );
 };

@@ -14,6 +14,7 @@ import {
   Switch,
   TextField,
   Tooltip,
+  Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -29,8 +30,8 @@ import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { RoleSelect } from '@/shared/components/RoleSelect';
 import { useToast } from '@/shared/components/useToast';
-import { PermissionGuard } from '@/shared/components/guards/PermissionGuard';
-import { ACTION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
+import { RESOURCE_PERMISSION_RULES } from '@/shared/constants/permission.constants';
+import { usePermission } from '@/shared/hooks/usePermission';
 import type { UserRecord } from '@/shared/types/auth.types';
 import type { Role } from '@/shared/types/rbac.types';
 
@@ -46,6 +47,7 @@ const emptyUserValues: UserFormValues = {
 export const UsersPage = () => {
   const session = useAuthStore((state) => state.session);
   const refreshSession = useAuthStore((state) => state.refreshSession);
+  const { canAny } = usePermission();
   const { showToast } = useToast();
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -65,6 +67,9 @@ export const UsersPage = () => {
     () => new Map(roles.map((role) => [role.id, role.name])),
     [roles],
   );
+  const canCreateUser = canAny(RESOURCE_PERMISSION_RULES.users.create);
+  const canUpdateUser = canAny(RESOURCE_PERMISSION_RULES.users.update);
+  const canDeleteUser = canAny(RESOURCE_PERMISSION_RULES.users.delete);
 
   const loadData = async () => {
     if (!session) {
@@ -200,11 +205,11 @@ export const UsersPage = () => {
   return (
     <>
       <PageHeader title="Users" subtitle="Create users, assign roles, and manage tenant access.">
-        <PermissionGuard resource={RESOURCE_KEYS.users} action={ACTION_KEYS.create}>
+        {canCreateUser && (
           <AppButton startIcon={<AddIcon />} onClick={openCreateDialog}>
             Create user
           </AppButton>
-        </PermissionGuard>
+        )}
       </PageHeader>
 
       {users.length === 0 ? (
@@ -234,12 +239,17 @@ export const UsersPage = () => {
               label: 'Actions',
               render: (user) => (
                 <Stack direction="row" spacing={0.5}>
-                  <PermissionGuard resource={RESOURCE_KEYS.users} action={ACTION_KEYS.update}>
+                  {canUpdateUser && (
+                    <>
                     <Tooltip title="Edit user">
                       <IconButton size="small" aria-label="Edit user" onClick={() => openEditDialog(user)}>
                         <EditIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
+                    </>
+                  )}
+                  {canUpdateUser && (
+                    <>
                     <Tooltip title="Assign roles">
                       <IconButton
                         size="small"
@@ -249,6 +259,10 @@ export const UsersPage = () => {
                         <GroupAddIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
+                    </>
+                  )}
+                  {canUpdateUser && (
+                    <>
                     <Tooltip title={user.status === 'active' ? 'Deactivate user' : 'Activate user'}>
                       <IconButton
                         size="small"
@@ -262,8 +276,9 @@ export const UsersPage = () => {
                         )}
                       </IconButton>
                     </Tooltip>
-                  </PermissionGuard>
-                  <PermissionGuard resource={RESOURCE_KEYS.users} action={ACTION_KEYS.delete}>
+                    </>
+                  )}
+                  {canDeleteUser && (
                     <Tooltip title="Delete user">
                       <IconButton
                         size="small"
@@ -274,7 +289,7 @@ export const UsersPage = () => {
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                  </PermissionGuard>
+                  )}
                 </Stack>
               ),
             },
@@ -369,6 +384,16 @@ export const UsersPage = () => {
             value={roleAssignmentDraft}
             onChange={setRoleAssignmentDraft}
           />
+          <Stack spacing={1}>
+            <Typography variant="subtitle2">Effective permissions</Typography>
+            {roles
+              .filter((role) => roleAssignmentDraft.includes(role.id))
+              .map((role) => (
+                <Typography key={role.id} variant="caption" color="text.secondary">
+                  {role.code}: {Object.entries(role.permissions).map(([resource, permissions]) => `${resource} [${permissions.join(', ')}]`).join('; ') || 'No grants'}
+                </Typography>
+              ))}
+          </Stack>
           <DialogActions sx={{ px: 0 }}>
             <AppButton variant="outlined" color="inherit" onClick={() => setRoleAssignmentUser(null)}>
               Cancel

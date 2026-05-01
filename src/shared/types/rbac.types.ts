@@ -1,11 +1,30 @@
-import type { ActionKey, ResourceKey } from '@/shared/constants/permission.constants';
+import type { PermissionKey, ResourceKey, ResourceType } from '@/shared/constants/permission.constants';
 
-export type Permission = {
-  id: string;
-  resource: ResourceKey;
-  action: ActionKey;
-  description: string;
+export type ResourcePermissionDefinition = {
+  key: PermissionKey;
+  label: string;
 };
+
+export type ResourceRecord = {
+  id: string;
+  resourceKey: ResourceKey;
+  resourceName: string;
+  resourceType: ResourceType;
+  resourceGroup: string;
+  description: string;
+  allowedPermissions: ResourcePermissionDefinition[];
+  sequenceNo?: number;
+  parentResourceKey?: ResourceKey;
+  httpMethod?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  apiPath?: string;
+  microservice?: string;
+  isUiVisible: boolean;
+  isActive: boolean;
+  uiPath?: string;
+  icon?: string;
+};
+
+export type RolePermissionGrants = Record<ResourceKey, PermissionKey[]>;
 
 export type Role = {
   id: string;
@@ -13,20 +32,13 @@ export type Role = {
   code: string;
   name: string;
   description: string;
-  permissionIds: string[];
+  permissions: RolePermissionGrants;
   isSystem?: boolean;
-};
-
-export type Resource = {
-  id: ResourceKey;
-  label: string;
-  description: string;
-  group: string;
 };
 
 export type PermissionRequirement = {
   resource: ResourceKey;
-  action: ActionKey;
+  permission: PermissionKey;
 };
 
-export type PermissionIndex = Record<ResourceKey, Partial<Record<ActionKey, boolean>>>;
+export type EffectivePermissions = RolePermissionGrants;

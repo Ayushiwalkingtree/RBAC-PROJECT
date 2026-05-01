@@ -23,8 +23,8 @@ import { DataTable } from '@/shared/components/DataTable';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useToast } from '@/shared/components/useToast';
-import { PermissionGuard } from '@/shared/components/guards/PermissionGuard';
-import { ACTION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
+import { RESOURCE_PERMISSION_RULES } from '@/shared/constants/permission.constants';
+import { usePermission } from '@/shared/hooks/usePermission';
 import type { Ticket } from '@/shared/types/domain.types';
 
 const emptyTicketValues: TicketFormValues = {
@@ -36,6 +36,7 @@ const emptyTicketValues: TicketFormValues = {
 
 export const TicketsPage = () => {
   const session = useAuthStore((state) => state.session);
+  const { canAny } = usePermission();
   const { showToast } = useToast();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -43,6 +44,11 @@ export const TicketsPage = () => {
   const [assigningTicket, setAssigningTicket] = useState<Ticket | null>(null);
   const [deletingTicket, setDeletingTicket] = useState<Ticket | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const canCreateTicket = canAny(RESOURCE_PERMISSION_RULES.loans.create);
+  const canUpdateTicket = canAny(RESOURCE_PERMISSION_RULES.loans.update);
+  const canDeleteTicket = canAny(RESOURCE_PERMISSION_RULES.loans.delete);
+  const canApproveTicket = canAny(RESOURCE_PERMISSION_RULES.loans.approve);
+  const canRejectTicket = canAny(RESOURCE_PERMISSION_RULES.loans.reject);
 
   const { control, handleSubmit, reset } = useForm<TicketFormValues>({
     resolver: zodResolver(ticketSchema),
@@ -137,11 +143,11 @@ export const TicketsPage = () => {
   return (
     <>
       <PageHeader title="Tickets" subtitle="Create, update, assign, and close tenant tickets.">
-        <PermissionGuard resource={RESOURCE_KEYS.tickets} action={ACTION_KEYS.create}>
+        {canCreateTicket && (
           <AppButton startIcon={<AddIcon />} onClick={() => setCreateDialogOpen(true)}>
             Create ticket
           </AppButton>
-        </PermissionGuard>
+        )}
       </PageHeader>
 
       {tickets.length === 0 ? (
@@ -161,27 +167,27 @@ export const TicketsPage = () => {
               label: 'Actions',
               render: (ticket) => (
                 <Stack direction="row" spacing={0.5}>
-                  <PermissionGuard resource={RESOURCE_KEYS.tickets} action={ACTION_KEYS.update}>
+                  {canUpdateTicket && (
                     <Tooltip title="Edit ticket">
                       <IconButton size="small" aria-label="Edit ticket" onClick={() => openEditDialog(ticket)}>
                         <EditIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                  </PermissionGuard>
-                  <PermissionGuard resource={RESOURCE_KEYS.tickets} action={ACTION_KEYS.assign}>
+                  )}
+                  {(canApproveTicket || canRejectTicket) && (
                     <Tooltip title="Assign ticket">
                       <IconButton size="small" aria-label="Assign ticket" onClick={() => openAssignDialog(ticket)}>
                         <AssignmentIndIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                  </PermissionGuard>
-                  <PermissionGuard resource={RESOURCE_KEYS.tickets} action={ACTION_KEYS.delete}>
+                  )}
+                  {canDeleteTicket && (
                     <Tooltip title="Delete ticket">
                       <IconButton size="small" aria-label="Delete ticket" color="error" onClick={() => setDeletingTicket(ticket)}>
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                  </PermissionGuard>
+                  )}
                 </Stack>
               ),
             },

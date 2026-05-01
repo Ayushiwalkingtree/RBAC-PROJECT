@@ -1,9 +1,10 @@
 import authData from '@/mock/data/auth.json';
 import { mockDbService } from '@/mock/services/mockDb.service';
 import { AUTH_CONFIG } from '@/shared/constants/app.constants';
-import { filterNavigationByPermissions } from '@/shared/utils/rbac';
+import { mergeRolePermissions } from '@/shared/utils/rbac';
+import { navigationService } from '@/shared/services/navigation.service';
 import type { AuthSession, LoginCredentials, Organization, UserRecord } from '@/shared/types/auth.types';
-import type { Permission, Role } from '@/shared/types/rbac.types';
+import type { Role } from '@/shared/types/rbac.types';
 import { createMockJwt } from './token.service';
 
 const normalize = (value: string): string => value.trim().toLowerCase();
@@ -11,15 +12,13 @@ const normalize = (value: string): string => value.trim().toLowerCase();
 const buildSession = (
   user: UserRecord,
   org: Organization,
-  roles: Role[],
-  permissions: Permission[],
-  navigation: AuthSession['navigation'],
+  allRoles: Role[],
+  resources: AuthSession['resources'],
 ): AuthSession => {
-  const userRoles = roles.filter(
+  const userRoles = allRoles.filter(
     (role) => role.orgId === org.id && user.roleIds.includes(role.id),
   );
-  const permissionIds = new Set(userRoles.flatMap((role) => role.permissionIds));
-  const resolvedPermissions = permissions.filter((permission) => permissionIds.has(permission.id));
+  const effectivePermissions = mergeRolePermissions(userRoles);
   const { token, refreshToken, expiresAt } = createMockJwt(user.id, org.id);
 
   return {
@@ -41,8 +40,9 @@ const buildSession = (
       roles: userRoles.map((role) => role.name),
     },
     roles: userRoles,
-    permissions: resolvedPermissions,
-    navigation: filterNavigationByPermissions(navigation, resolvedPermissions),
+    permissions: effectivePermissions,
+    resources,
+    navigation: navigationService.buildNavigation(resources, effectivePermissions, org.code),
   };
 };
 
@@ -71,7 +71,7 @@ export const authService = {
       throw new Error('Invalid credentials for this organization.');
     }
 
-    return buildSession(user, org, database.roles, database.permissions, database.navigation);
+    return buildSession(user, org, database.roles, database.resources);
   },
 
   refreshCurrentUserPermissions: async (session: AuthSession): Promise<AuthSession | null> => {
@@ -85,6 +85,6 @@ export const authService = {
       return null;
     }
 
-    return buildSession(user, org, database.roles, database.permissions, database.navigation);
+    return buildSession(user, org, database.roles, database.resources);
   },
 };

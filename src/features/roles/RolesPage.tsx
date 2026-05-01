@@ -16,7 +16,7 @@ import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useToast } from '@/shared/components/useToast';
 import { PermissionGuard } from '@/shared/components/guards/PermissionGuard';
-import { ACTION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
+import { PERMISSION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
 import type { Role } from '@/shared/types/rbac.types';
 
 const emptyRoleValues: RoleFormValues = {
@@ -115,7 +115,7 @@ export const RolesPage = () => {
   return (
     <>
       <PageHeader title="Roles" subtitle="Create role bundles; enforcement still uses permissions only.">
-        <PermissionGuard resource={RESOURCE_KEYS.roles} action={ACTION_KEYS.create}>
+        <PermissionGuard resource={RESOURCE_KEYS.roleManageApi} permission={PERMISSION_KEYS.create}>
           <AppButton startIcon={<AddIcon />} onClick={() => setCreateDialogOpen(true)}>
             Create role
           </AppButton>
@@ -140,21 +140,26 @@ export const RolesPage = () => {
             {
               id: 'permissions',
               label: 'Permissions',
-              render: (role) => <Chip label={role.permissionIds.length} size="small" />,
+              render: (role) => (
+                <Chip
+                  label={Object.values(role.permissions).reduce((total, grants) => total + grants.length, 0)}
+                  size="small"
+                />
+              ),
             },
             {
               id: 'actions',
               label: 'Actions',
               render: (role) => (
                 <Stack direction="row" spacing={0.5}>
-                  <PermissionGuard resource={RESOURCE_KEYS.roles} action={ACTION_KEYS.update}>
+                  <PermissionGuard resource={RESOURCE_KEYS.roleManageApi} permission={PERMISSION_KEYS.update}>
                     <Tooltip title="Edit role">
                       <IconButton size="small" aria-label="Edit role" onClick={() => openEditDialog(role)}>
                         <EditIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                   </PermissionGuard>
-                  <PermissionGuard resource={RESOURCE_KEYS.roles} action={ACTION_KEYS.delete}>
+                  <PermissionGuard resource={RESOURCE_KEYS.roleManageApi} permission={PERMISSION_KEYS.delete}>
                     <Tooltip title={role.isSystem ? 'System roles cannot be deleted' : 'Delete role'}>
                       <span>
                         <IconButton

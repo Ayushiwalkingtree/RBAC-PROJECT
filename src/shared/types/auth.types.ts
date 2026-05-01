@@ -1,5 +1,5 @@
 import type { NavigationItem } from '@/shared/types/navigation.types';
-import type { Permission, Role } from '@/shared/types/rbac.types';
+import type { EffectivePermissions, ResourceRecord, Role } from '@/shared/types/rbac.types';
 
 export type Organization = {
   id: string;
@@ -34,7 +34,8 @@ export type AuthSession = {
   user: AuthUser;
   org: Organization;
   roles: Role[];
-  permissions: Permission[];
+  permissions: EffectivePermissions;
+  resources: ResourceRecord[];
   navigation: NavigationItem[];
 };
 

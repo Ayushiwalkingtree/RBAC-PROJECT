@@ -1,4 +1,4 @@
-import type { PermissionRequirement } from '@/shared/types/rbac.types';
+import type { ResourceKey } from '@/shared/constants/permission.constants';
 
 export type NavigationItem = {
   id: string;
@@ -6,5 +6,7 @@ export type NavigationItem = {
   path: string;
   icon: string;
   order: number;
-  requiredPermission: PermissionRequirement;
+  resourceKey: ResourceKey;
+  parentResourceKey?: ResourceKey;
+  children?: NavigationItem[];
 };
