@@ -1,4 +1,6 @@
 import Brightness4Icon from '@mui/icons-material/Brightness4';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import {
@@ -12,6 +14,7 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Collapse,
   Stack,
   Toolbar,
   Tooltip,
@@ -19,11 +22,13 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { useState, type PropsWithChildren } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { APP_CONFIG } from '@/shared/constants/app.constants';
+import { STORAGE_KEYS } from '@/shared/constants/storage.constants';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { useThemeStore } from '@/shared/theme/theme.store';
+import type { NavigationItem } from '@/shared/types/navigation.types';
 import { NavigationIcon } from './NavigationIcon';
 
 const drawerContentId = 'tenant-navigation';
@@ -37,10 +42,96 @@ export const AppShell = ({ children }: PropsWithChildren) => {
   const cycleMode = useThemeStore((state) => state.cycleMode);
   const mode = useThemeStore((state) => state.mode);
   const navigate = useNavigate();
+  const location = useLocation();
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(() => {
+    const stored = window.localStorage.getItem(STORAGE_KEYS.navExpanded);
+    return stored ? (JSON.parse(stored) as Record<string, boolean>) : {};
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEYS.navExpanded, JSON.stringify(expandedItems));
+  }, [expandedItems]);
+
+  const activeParents = useMemo(() => {
+    const active = new Set<string>();
+    const visit = (item: NavigationItem): boolean => {
+      const childActive = item.children?.some(visit) ?? false;
+      const selfActive = location.pathname === item.path;
+      if (childActive) {
+        active.add(item.resourceKey);
+      }
+      return selfActive || childActive;
+    };
+
+    session?.navigation.forEach(visit);
+    return active;
+  }, [location.pathname, session?.navigation]);
 
   const handleLogout = () => {
     logout();
     navigate(APP_CONFIG.loginRoute, { replace: true });
+  };
+
+  const toggleExpanded = (resourceKey: string) => {
+    setExpandedItems((current) => ({ ...current, [resourceKey]: !current[resourceKey] }));
+  };
+
+  const renderNavigationItem = (item: NavigationItem, depth = 0) => {
+    const hasChildren = Boolean(item.children?.length);
+    const isExpanded = expandedItems[item.resourceKey] ?? activeParents.has(item.resourceKey);
+    const isParentActive = activeParents.has(item.resourceKey);
+
+    return (
+      <Box key={item.id}>
+        <ListItemButton
+          component={NavLink}
+          to={item.path}
+          onClick={() => {
+            if (!hasChildren) {
+              setMobileOpen(false);
+            }
+          }}
+          sx={{
+            borderRadius: 1,
+            mb: 0.5,
+            pl: 1.5 + depth * 2,
+            color: isParentActive ? 'primary.main' : undefined,
+            bgcolor: isParentActive ? 'action.selected' : undefined,
+            '&.active': {
+              color: 'primary.main',
+              bgcolor: 'action.selected',
+              '& .MuiListItemIcon-root': { color: 'primary.main' },
+            },
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 40 }}>
+            <NavigationIcon name={item.icon} />
+          </ListItemIcon>
+          <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: 700 }} />
+          {hasChildren && (
+            <IconButton
+              size="small"
+              edge="end"
+              aria-label={isExpanded ? 'Collapse navigation item' : 'Expand navigation item'}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                toggleExpanded(item.resourceKey);
+              }}
+            >
+              {isExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+            </IconButton>
+          )}
+        </ListItemButton>
+        {hasChildren && (
+          <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+            <List disablePadding>
+              {item.children?.map((child) => renderNavigationItem(child, depth + 1))}
+            </List>
+          </Collapse>
+        )}
+      </Box>
+    );
   };
 
   const drawer = (
@@ -53,28 +144,7 @@ export const AppShell = ({ children }: PropsWithChildren) => {
       </Box>
       <Divider />
       <List id={drawerContentId} sx={{ px: 1.5, py: 2, flexGrow: 1 }}>
-        {session?.navigation.map((item) => (
-          <ListItemButton
-            key={item.id}
-            component={NavLink}
-            to={item.path}
-            onClick={() => setMobileOpen(false)}
-            sx={{
-              borderRadius: 1,
-              mb: 0.5,
-              '&.active': {
-                color: 'primary.main',
-                bgcolor: 'action.selected',
-                '& .MuiListItemIcon-root': { color: 'primary.main' },
-              },
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 40 }}>
-              <NavigationIcon name={item.icon} />
-            </ListItemIcon>
-            <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: 700 }} />
-          </ListItemButton>
-        ))}
+        {session?.navigation.map((item) => renderNavigationItem(item))}
       </List>
       <Divider />
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ p: 2 }}>

@@ -27,7 +27,6 @@ export const navPreviewService = {
 
     const roles = database.roles.filter((role) => user.roleIds.includes(role.id));
     const permissions = mergeRolePermissions(roles);
-    const org = database.organizations.find((candidate) => candidate.id === user.orgId);
     const apiResources = database.resources.filter(
       (resource) => resource.resourceType === 'API' && permissions[resource.resourceKey]?.length,
     );
@@ -35,7 +34,10 @@ export const navPreviewService = {
     return {
       user,
       permissions,
-      navigation: navigationService.buildNavigation(database.resources, permissions, org?.code),
+      navigation: navigationService.buildNavigation(database.resources, permissions, {
+        orgCode: user.orgCode,
+        roles: roles.map((role) => role.name),
+      }),
       apiResources,
     };
   },

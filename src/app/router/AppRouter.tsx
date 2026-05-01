@@ -5,6 +5,7 @@ import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { PermissionsMatrixPage } from '@/features/permissions/PermissionsMatrixPage';
 import { ReportsPage } from '@/features/reports/ReportsPage';
 import { ResourceRegistryPage } from '@/features/resources/ResourceRegistryPage';
+import { DynamicResourcePage } from '@/features/resources/DynamicResourcePage';
 import { RolesPage } from '@/features/roles/RolesPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { TicketsPage } from '@/features/tickets/TicketsPage';
@@ -72,6 +73,7 @@ export const AppRouter = () => (
             element={protectedElement(ROUTES.resourceRegistry, <ResourceRegistryPage />)}
           />
           <Route path={ROUTES.navPreview} element={protectedElement(ROUTES.navPreview, <NavPreviewPage />)} />
+          <Route path="*" element={<DynamicResourcePage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to={APP_CONFIG.defaultRoute} replace />} />

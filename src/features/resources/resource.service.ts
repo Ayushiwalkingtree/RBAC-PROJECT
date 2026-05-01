@@ -2,6 +2,8 @@ import { mockDbService } from '@/mock/services/mockDb.service';
 import { createId } from '@/shared/utils/id';
 import type { ResourceFormValues } from '@/features/resources/resource.schema';
 import { normalizeResourceFormValues } from '@/features/resources/resourceForm.utils';
+import { RESOURCE_TYPES } from '@/shared/constants/permission.constants';
+import { slugifyResourceName } from '@/shared/services/navigation.service';
 import type { ResourceRecord } from '@/shared/types/rbac.types';
 
 const normalizeKey = (value: string): string => value.trim().toUpperCase();
@@ -15,6 +17,14 @@ const routeForResourceKey = (resourceKey: string): string | undefined => {
   if (resourceKey.includes('PERM')) return '/permissions';
   if (resourceKey.includes('RESOURCE')) return '/resource-registry';
   return undefined;
+};
+
+const routeForResource = (resource: Pick<ResourceRecord, 'resourceType' | 'resourceKey' | 'resourceName' | 'displayName'>): string | undefined => {
+  const slug = slugifyResourceName(resource.displayName ?? resource.resourceName);
+  if (resource.resourceType === RESOURCE_TYPES.report) return `/reports/${slug || resource.resourceKey.toLowerCase()}`;
+  if (resource.resourceType === RESOURCE_TYPES.dashboard) return `/dashboard/${slug || resource.resourceKey.toLowerCase()}`;
+  if (resource.resourceType === RESOURCE_TYPES.page || resource.resourceType === RESOURCE_TYPES.menu) return `/${slug || resource.resourceKey.toLowerCase()}`;
+  return routeForResourceKey(resource.resourceKey);
 };
 
 const toResourceRecord = (values: ResourceFormValues, existing?: ResourceRecord): ResourceRecord => {
@@ -41,7 +51,12 @@ const toResourceRecord = (values: ResourceFormValues, existing?: ResourceRecord)
     microservice: normalizedValues.microservice?.trim() || undefined,
     isUiVisible: normalizedValues.is_ui_visible,
     isActive: normalizedValues.is_active,
-    uiPath: existing?.uiPath ?? routeForResourceKey(resourceKey),
+    uiPath: existing?.uiPath ?? routeForResource({
+      resourceKey,
+      resourceName: normalizedValues.resource_name,
+      resourceType: normalizedValues.resource_type,
+      displayName: normalizedValues.resource_name,
+    }),
     icon: existing?.icon,
   };
 };
@@ -120,5 +135,28 @@ export const resourceService = {
         }),
       };
     });
+  },
+
+  updateNavigationOrder: async (
+    updates: Array<Pick<ResourceRecord, 'id' | 'parentResourceKey' | 'sequenceNo'>>,
+  ): Promise<ResourceRecord[]> => {
+    const updateById = new Map(updates.map((update) => [update.id, update]));
+    const database = await mockDbService.updateDatabase((currentDatabase) => ({
+      ...currentDatabase,
+      resources: currentDatabase.resources.map((resource) => {
+        const update = updateById.get(resource.id);
+        if (!update) {
+          return resource;
+        }
+
+        return {
+          ...resource,
+          parentResourceKey: update.parentResourceKey || undefined,
+          sequenceNo: update.sequenceNo,
+        };
+      }),
+    }));
+
+    return database.resources;
   },
 };

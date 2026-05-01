@@ -1,9 +1,26 @@
 import { PERMISSION_KEYS, RESOURCE_TYPES } from '@/shared/constants/permission.constants';
 import { canAccess } from '@/shared/utils/rbac';
+import type { AuthUser } from '@/shared/types/auth.types';
 import type { EffectivePermissions, ResourceRecord } from '@/shared/types/rbac.types';
 import type { NavigationItem } from '@/shared/types/navigation.types';
 
-const fallbackPathForResource = (resource: ResourceRecord): string => {
+export const slugifyResourceName = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-|-$/gu, '');
+
+export const pathForResource = (resource: ResourceRecord): string => {
+  if (resource.uiPath) return resource.uiPath;
+
+  const slug = slugifyResourceName(resource.displayName ?? resource.resourceName);
+  if (resource.resourceType === RESOURCE_TYPES.report) return `/reports/${slug || resource.resourceKey.toLowerCase()}`;
+  if (resource.resourceType === RESOURCE_TYPES.dashboard) return `/dashboard/${slug || resource.resourceKey.toLowerCase()}`;
+  if (resource.resourceType === RESOURCE_TYPES.menu || resource.resourceType === RESOURCE_TYPES.page) {
+    return `/${slug || resource.resourceKey.toLowerCase()}`;
+  }
+
   const key = resource.resourceKey.toUpperCase();
   if (key.includes('DASH')) return '/dashboard';
   if (key.includes('USER')) return '/users';
@@ -37,37 +54,55 @@ const navigableTypes = new Set<string>([
   RESOURCE_TYPES.report,
 ]);
 
+const isPlatformSuperAdmin = (currentUser?: Pick<AuthUser, 'orgCode' | 'roles'>): boolean =>
+  currentUser?.orgCode === 'PLATFORM' && currentUser.roles.some((role) => role.toUpperCase().includes('SUPER ADMIN'));
+
+const bySequence = (current: NavigationItem, next: NavigationItem): number =>
+  current.sequenceNo - next.sequenceNo || current.label.localeCompare(next.label);
+
+const toNavigationItem = (resource: ResourceRecord): NavigationItem => ({
+  id: resource.id,
+  label: resource.displayName ?? resource.resourceName,
+  path: pathForResource(resource),
+  icon: resource.icon ?? fallbackIconForResource(resource),
+  type: resource.resourceType,
+  sequenceNo: resource.sequenceNo ?? 9999,
+  order: resource.sequenceNo ?? 9999,
+  resourceKey: resource.resourceKey,
+  parentResourceKey: resource.parentResourceKey,
+  children: [],
+});
+
 export const navigationService = {
   buildNavigation: (
     resources: ResourceRecord[],
     permissions: EffectivePermissions,
-    orgCode?: string,
+    currentUser?: Pick<AuthUser, 'orgCode' | 'roles'>,
   ): NavigationItem[] => {
-    const visibleResources = resources
-      .filter(
-        (resource) =>
-          resource.isActive &&
-          resource.isUiVisible &&
-          navigableTypes.has(resource.resourceType) &&
-          canAccess(permissions, resource.resourceKey, PERMISSION_KEYS.view) &&
-          (resource.resourceKey !== 'RESOURCE_REGISTRY_MENU' ||
-            orgCode === 'PLATFORM' ||
-            canAccess(permissions, 'RESOURCE_MANAGE_API', PERMISSION_KEYS.create) ||
-            canAccess(permissions, 'RESOURCE_MANAGE_API', PERMISSION_KEYS.update) ||
-            canAccess(permissions, 'RESOURCE_MANAGE_API', PERMISSION_KEYS.delete)),
-      )
-      .sort((current, next) => (current.sequenceNo ?? 9999) - (next.sequenceNo ?? 9999));
+    const isSuperAdmin = isPlatformSuperAdmin(currentUser);
+    const navigableResources = resources.filter(
+      (resource) =>
+        resource.isActive &&
+        resource.isUiVisible &&
+        navigableTypes.has(resource.resourceType),
+    );
+    const resourcesByKey = new Map(navigableResources.map((resource) => [resource.resourceKey, resource]));
+    const visibleResourceKeys = new Set<string>();
 
-    const items = visibleResources.map<NavigationItem>((resource) => ({
-      id: resource.id,
-      label: resource.resourceName,
-      path: resource.uiPath ?? fallbackPathForResource(resource),
-      icon: resource.icon ?? fallbackIconForResource(resource),
-      order: resource.sequenceNo ?? 9999,
-      resourceKey: resource.resourceKey,
-      parentResourceKey: resource.parentResourceKey,
-      children: [],
-    }));
+    navigableResources.forEach((resource) => {
+      if (isSuperAdmin || canAccess(permissions, resource.resourceKey, PERMISSION_KEYS.view)) {
+        visibleResourceKeys.add(resource.resourceKey);
+        let parentKey = resource.parentResourceKey;
+        while (parentKey && resourcesByKey.has(parentKey)) {
+          visibleResourceKeys.add(parentKey);
+          parentKey = resourcesByKey.get(parentKey)?.parentResourceKey;
+        }
+      }
+    });
+
+    const items = navigableResources
+      .filter((resource) => visibleResourceKeys.has(resource.resourceKey))
+      .map(toNavigationItem);
 
     const itemByResourceKey = new Map(items.map((item) => [item.resourceKey, item]));
     const roots: NavigationItem[] = [];
@@ -81,6 +116,12 @@ export const navigationService = {
       roots.push(item);
     });
 
-    return roots;
+    const sortTree = (itemsToSort: NavigationItem[]): NavigationItem[] =>
+      itemsToSort.sort(bySequence).map((item) => ({
+        ...item,
+        children: item.children ? sortTree(item.children) : [],
+      }));
+
+    return sortTree(roots);
   },
 };

@@ -42,7 +42,10 @@ const buildSession = (
     roles: userRoles,
     permissions: effectivePermissions,
     resources,
-    navigation: navigationService.buildNavigation(resources, effectivePermissions, org.code),
+    navigation: navigationService.buildNavigation(resources, effectivePermissions, {
+      orgCode: user.orgCode,
+      roles: userRoles.map((role) => role.name),
+    }),
   };
 };
 

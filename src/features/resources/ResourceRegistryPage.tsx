@@ -1,5 +1,6 @@
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import EditIcon from '@mui/icons-material/Edit';
 import {
   Box,
@@ -15,6 +16,10 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useEffect, useMemo, useState } from 'react';
 import { AppButton } from '@/shared/components/AppButton';
 import { AppDialog } from '@/shared/components/AppDialog';
@@ -38,6 +43,13 @@ import type { BusinessPermissionRow } from '@/shared/adapters/rbacDisplay.adapte
 import type { ResourceFormValues } from '@/features/resources/resource.schema';
 import type { ResourceRecord } from '@/shared/types/rbac.types';
 
+const navigableTypes = new Set<string>([
+  RESOURCE_TYPES.menu,
+  RESOURCE_TYPES.page,
+  RESOURCE_TYPES.report,
+  RESOURCE_TYPES.dashboard,
+]);
+
 const canManageResources = (
   can: ReturnType<typeof usePermission>['can'],
   sessionOrgCode?: string,
@@ -45,6 +57,61 @@ const canManageResources = (
   sessionOrgCode === 'PLATFORM' ||
   (can(RESOURCE_KEYS.resourceRegistryMenu, PERMISSION_KEYS.view) &&
     can(RESOURCE_KEYS.resourceManageApi, PERMISSION_KEYS.create));
+
+type SortableNavigationRowProps = {
+  resource: ResourceRecord;
+  parentOptions: ResourceRecord[];
+  onParentChange: (resourceId: string, parentResourceKey: string) => void;
+};
+
+const SortableNavigationRow = ({ resource, parentOptions, onParentChange }: SortableNavigationRowProps) => {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: resource.id });
+
+  return (
+    <Paper
+      ref={setNodeRef}
+      elevation={0}
+      sx={{
+        border: 1,
+        borderColor: 'divider',
+        p: 1.25,
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+    >
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
+        <IconButton {...attributes} {...listeners} aria-label="Drag navigation item" size="small">
+          <DragIndicatorIcon fontSize="small" />
+        </IconButton>
+        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <Typography variant="body2" fontWeight={900} noWrap>
+            {resource.displayName ?? resource.resourceName}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Sequence {resource.sequenceNo ?? 9999}
+          </Typography>
+        </Box>
+        <TextField
+          select
+          label="Parent"
+          value={resource.parentResourceKey ?? ''}
+          onChange={(event) => onParentChange(resource.id, event.target.value)}
+          size="small"
+          sx={{ minWidth: 240 }}
+        >
+          <MenuItem value="">Top level</MenuItem>
+          {parentOptions
+            .filter((parent) => parent.resourceKey !== resource.resourceKey)
+            .map((parent) => (
+              <MenuItem key={parent.resourceKey} value={parent.resourceKey}>
+                {parent.displayName ?? parent.resourceName}
+              </MenuItem>
+            ))}
+        </TextField>
+      </Stack>
+    </Paper>
+  );
+};
 
 export const ResourceRegistryPage = () => {
   const session = useAuthStore((state) => state.session);
@@ -55,15 +122,24 @@ export const ResourceRegistryPage = () => {
   const [selectedRowId, setSelectedRowId] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [showTechnicalResources, setShowTechnicalResources] = useState(false);
+  const [navigationOrderMode, setNavigationOrderMode] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<ResourceRecord | null>(null);
   const [deletingResource, setDeletingResource] = useState<ResourceRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const canManage = canManageResources(can, session?.org.code);
   const isPlatform = session?.org.code === 'PLATFORM';
   const parentResources = resources.filter(
     (resource) => resource.resourceType === RESOURCE_TYPES.menu && resource.isActive,
+  );
+  const navResources = useMemo(
+    () =>
+      resources
+        .filter((resource) => resource.isActive && resource.isUiVisible && navigableTypes.has(resource.resourceType))
+        .sort((current, next) => (current.sequenceNo ?? 9999) - (next.sequenceNo ?? 9999)),
+    [resources],
   );
   const businessRows = useMemo(() => buildBusinessPermissionRows(resources), [resources]);
   const technicalRows = useMemo(() => buildTechnicalPermissionRows(resources), [resources]);
@@ -152,6 +228,50 @@ export const ResourceRegistryPage = () => {
     }
   };
 
+  const persistNavigationUpdates = async (
+    updates: Array<Pick<ResourceRecord, 'id' | 'parentResourceKey' | 'sequenceNo'>>,
+  ) => {
+    try {
+      const nextResources = await resourceService.updateNavigationOrder(updates);
+      setResources(nextResources);
+      await refreshSession();
+      showToast('Navigation order updated.');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to update navigation order.', 'error');
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = navResources.findIndex((resource) => resource.id === active.id);
+    const newIndex = navResources.findIndex((resource) => resource.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const reordered = arrayMove(navResources, oldIndex, newIndex);
+    void persistNavigationUpdates(
+      reordered.map((resource, index) => ({
+        id: resource.id,
+        parentResourceKey: resource.parentResourceKey,
+        sequenceNo: (index + 1) * 10,
+      })),
+    );
+  };
+
+  const handleParentChange = (resourceId: string, parentResourceKey: string) => {
+    const resource = resources.find((candidate) => candidate.id === resourceId);
+    if (!resource) return;
+
+    void persistNavigationUpdates([
+      {
+        id: resource.id,
+        parentResourceKey: parentResourceKey || undefined,
+        sequenceNo: resource.sequenceNo,
+      },
+    ]);
+  };
+
   return (
     <>
       <PageHeader title="Resource Registry" subtitle="Manage business features and their available actions.">
@@ -171,6 +291,12 @@ export const ResourceRegistryPage = () => {
             />
           )}
           {canManage && (
+            <FormControlLabel
+              control={<Switch checked={navigationOrderMode} onChange={(_, checked) => setNavigationOrderMode(checked)} />}
+              label="Navigation Order"
+            />
+          )}
+          {canManage && (
             <AppButton startIcon={<AddIcon />} onClick={openCreate}>
               Create Resource
             </AppButton>
@@ -178,6 +304,28 @@ export const ResourceRegistryPage = () => {
         </Stack>
       </PageHeader>
 
+      {navigationOrderMode ? (
+        <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2 }}>
+          <Typography variant="h6" sx={{ mb: 0.5 }}>Navigation Order</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Drag items to reorder. Use the parent dropdown to nest an item under an active menu.
+          </Typography>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={navResources.map((resource) => resource.id)} strategy={verticalListSortingStrategy}>
+              <Stack spacing={1}>
+                {navResources.map((resource) => (
+                  <SortableNavigationRow
+                    key={resource.id}
+                    resource={resource}
+                    parentOptions={parentResources}
+                    onParentChange={handleParentChange}
+                  />
+                ))}
+              </Stack>
+            </SortableContext>
+          </DndContext>
+        </Paper>
+      ) : (
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '360px 1fr' }, gap: 2 }}>
         <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2, minHeight: 560 }}>
           {showTechnicalResources && (
@@ -305,6 +453,7 @@ export const ResourceRegistryPage = () => {
           )}
         </Paper>
       </Box>
+      )}
 
       <AppDialog
         open={formOpen}
