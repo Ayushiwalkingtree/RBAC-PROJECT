@@ -1,0 +1,46 @@
+[
+  {
+    "id": "usr-acme-admin",
+    "orgId": "org-acme",
+    "orgCode": "ACME",
+    "email": "admin@example.com",
+    "password": "Password@123",
+    "name": "Avery Stone",
+    "title": "Platform Owner",
+    "status": "active",
+    "roleIds": ["role-acme-owner"]
+  },
+  {
+    "id": "usr-acme-agent",
+    "orgId": "org-acme",
+    "orgCode": "ACME",
+    "email": "agent@example.com",
+    "password": "Password@123",
+    "name": "Mira Patel",
+    "title": "Support Lead",
+    "status": "active",
+    "roleIds": ["role-acme-support"]
+  },
+  {
+    "id": "usr-globex-admin",
+    "orgId": "org-globex",
+    "orgCode": "GLOBEX",
+    "email": "admin@example.com",
+    "password": "Password@123",
+    "name": "Jordan Lee",
+    "title": "Security Administrator",
+    "status": "active",
+    "roleIds": ["role-globex-admin"]
+  },
+  {
+    "id": "usr-globex-reader",
+    "orgId": "org-globex",
+    "orgCode": "GLOBEX",
+    "email": "reader@example.com",
+    "password": "Password@123",
+    "name": "Sam Rivera",
+    "title": "Compliance Analyst",
+    "status": "active",
+    "roleIds": ["role-globex-reader"]
+  }
+]

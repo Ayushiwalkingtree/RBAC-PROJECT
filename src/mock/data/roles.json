@@ -1,0 +1,79 @@
+[
+  {
+    "id": "role-acme-owner",
+    "orgId": "org-acme",
+    "name": "Tenant Owner",
+    "description": "Full operational access for Acme",
+    "permissionIds": [
+      "perm-dashboard-view",
+      "perm-users-view",
+      "perm-users-create",
+      "perm-users-update",
+      "perm-users-delete",
+      "perm-roles-view",
+      "perm-roles-create",
+      "perm-roles-update",
+      "perm-roles-delete",
+      "perm-permissions-view",
+      "perm-permissions-assign",
+      "perm-tickets-view",
+      "perm-tickets-create",
+      "perm-tickets-update",
+      "perm-reports-view",
+      "perm-reports-export",
+      "perm-settings-view",
+      "perm-settings-manage"
+    ]
+  },
+  {
+    "id": "role-acme-support",
+    "orgId": "org-acme",
+    "name": "Support Lead",
+    "description": "Ticket operations with read-only access to admin areas",
+    "permissionIds": [
+      "perm-dashboard-view",
+      "perm-users-view",
+      "perm-roles-view",
+      "perm-permissions-view",
+      "perm-tickets-view",
+      "perm-tickets-create",
+      "perm-tickets-update",
+      "perm-reports-view",
+      "perm-settings-view"
+    ]
+  },
+  {
+    "id": "role-globex-admin",
+    "orgId": "org-globex",
+    "name": "Security Administrator",
+    "description": "Globex identity and audit administration",
+    "permissionIds": [
+      "perm-dashboard-view",
+      "perm-users-view",
+      "perm-users-create",
+      "perm-users-update",
+      "perm-roles-view",
+      "perm-roles-update",
+      "perm-permissions-view",
+      "perm-permissions-assign",
+      "perm-reports-view",
+      "perm-reports-export",
+      "perm-settings-view",
+      "perm-settings-manage"
+    ]
+  },
+  {
+    "id": "role-globex-reader",
+    "orgId": "org-globex",
+    "name": "Compliance Reader",
+    "description": "Read-only compliance visibility",
+    "permissionIds": [
+      "perm-dashboard-view",
+      "perm-users-view",
+      "perm-roles-view",
+      "perm-permissions-view",
+      "perm-reports-view",
+      "perm-settings-view"
+    ]
+  }
+]

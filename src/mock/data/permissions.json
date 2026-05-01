@@ -1,0 +1,20 @@
+[
+  { "id": "perm-dashboard-view", "resource": "dashboard", "action": "view", "description": "View tenant dashboard" },
+  { "id": "perm-users-view", "resource": "users", "action": "view", "description": "View users" },
+  { "id": "perm-users-create", "resource": "users", "action": "create", "description": "Create users" },
+  { "id": "perm-users-update", "resource": "users", "action": "update", "description": "Update users" },
+  { "id": "perm-users-delete", "resource": "users", "action": "delete", "description": "Delete users" },
+  { "id": "perm-roles-view", "resource": "roles", "action": "view", "description": "View roles" },
+  { "id": "perm-roles-create", "resource": "roles", "action": "create", "description": "Create roles" },
+  { "id": "perm-roles-update", "resource": "roles", "action": "update", "description": "Update roles" },
+  { "id": "perm-roles-delete", "resource": "roles", "action": "delete", "description": "Delete roles" },
+  { "id": "perm-permissions-view", "resource": "permissions", "action": "view", "description": "View permission matrix" },
+  { "id": "perm-permissions-assign", "resource": "permissions", "action": "assign", "description": "Assign permissions" },
+  { "id": "perm-tickets-view", "resource": "tickets", "action": "view", "description": "View tickets" },
+  { "id": "perm-tickets-create", "resource": "tickets", "action": "create", "description": "Create tickets" },
+  { "id": "perm-tickets-update", "resource": "tickets", "action": "update", "description": "Update tickets" },
+  { "id": "perm-reports-view", "resource": "reports", "action": "view", "description": "View reports" },
+  { "id": "perm-reports-export", "resource": "reports", "action": "export", "description": "Export reports" },
+  { "id": "perm-settings-view", "resource": "settings", "action": "view", "description": "View tenant settings" },
+  { "id": "perm-settings-manage", "resource": "settings", "action": "manage", "description": "Manage tenant settings" }
+]

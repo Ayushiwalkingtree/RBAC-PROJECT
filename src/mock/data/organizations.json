@@ -1,0 +1,14 @@
+[
+  {
+    "id": "org-acme",
+    "code": "ACME",
+    "name": "Acme Operations",
+    "status": "active"
+  },
+  {
+    "id": "org-globex",
+    "code": "GLOBEX",
+    "name": "Globex Enterprise",
+    "status": "active"
+  }
+]
