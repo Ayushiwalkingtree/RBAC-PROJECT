@@ -20,7 +20,16 @@ export const hasPermission = (
   action: ActionKey,
 ): boolean => {
   const permissionIndex = createPermissionIndex(permissions);
-  return Boolean(permissionIndex[resource]?.[action] || permissionIndex[resource]?.[ACTION_KEYS.manage]);
+  const resourcePermissions = permissionIndex[resource];
+  const readViewFallback =
+    (action === ACTION_KEYS.view && resourcePermissions?.[ACTION_KEYS.read]) ||
+    (action === ACTION_KEYS.read && resourcePermissions?.[ACTION_KEYS.view]);
+
+  return Boolean(
+    resourcePermissions?.[action] ||
+      resourcePermissions?.[ACTION_KEYS.manage] ||
+      readViewFallback,
+  );
 };
 
 export const filterNavigationByPermissions = (

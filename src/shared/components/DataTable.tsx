@@ -35,7 +35,11 @@ export const DataTable = <T,>({ columns, rows, getRowId }: DataTableProps<T>) =>
       </TableHead>
       <TableBody>
         {rows.map((row) => (
-          <TableRow key={getRowId(row)} hover>
+          <TableRow
+            key={getRowId(row)}
+            hover
+            sx={{ transition: 'background-color 160ms ease, transform 160ms ease' }}
+          >
             {columns.map((column) => (
               <TableCell key={column.id}>{column.render(row)}</TableCell>
             ))}

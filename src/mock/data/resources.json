@@ -1,9 +1,9 @@
 [
-  { "id": "dashboard", "label": "Dashboard", "description": "Tenant overview and operational health" },
-  { "id": "users", "label": "Users", "description": "User lifecycle and account access" },
-  { "id": "roles", "label": "Roles", "description": "Tenant role bundles backed by permissions" },
-  { "id": "permissions", "label": "Permissions Matrix", "description": "Permission coverage by resource and action" },
-  { "id": "tickets", "label": "Tickets", "description": "Support ticket operations" },
-  { "id": "reports", "label": "Reports", "description": "Analytics and exportable reports" },
-  { "id": "settings", "label": "Settings", "description": "Tenant-level configuration" }
+  { "id": "dashboard", "label": "Dashboard", "description": "Tenant overview and operational health", "group": "Workspace" },
+  { "id": "users", "label": "Users", "description": "User lifecycle and account access", "group": "Identity" },
+  { "id": "roles", "label": "Roles", "description": "Tenant role bundles backed by permissions", "group": "Identity" },
+  { "id": "permissions", "label": "Permissions Matrix", "description": "Permission coverage by resource and action", "group": "Identity" },
+  { "id": "tickets", "label": "Tickets", "description": "Support ticket operations", "group": "Operations" },
+  { "id": "reports", "label": "Reports", "description": "Analytics and exportable reports", "group": "Insights" },
+  { "id": "settings", "label": "Settings", "description": "Tenant-level configuration", "group": "Administration" }
 ]

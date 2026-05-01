@@ -1,33 +1,57 @@
 import authData from '@/mock/data/auth.json';
-import navigationData from '@/mock/data/navigation.json';
-import organizationsData from '@/mock/data/organizations.json';
-import permissionsData from '@/mock/data/permissions.json';
-import rolesData from '@/mock/data/roles.json';
-import usersData from '@/mock/data/users.json';
+import { mockDbService } from '@/mock/services/mockDb.service';
 import { AUTH_CONFIG } from '@/shared/constants/app.constants';
 import { filterNavigationByPermissions } from '@/shared/utils/rbac';
 import type { AuthSession, LoginCredentials, Organization, UserRecord } from '@/shared/types/auth.types';
-import type { NavigationItem } from '@/shared/types/navigation.types';
 import type { Permission, Role } from '@/shared/types/rbac.types';
 import { createMockJwt } from './token.service';
 
-const organizations = organizationsData as Organization[];
-const users = usersData as UserRecord[];
-const roles = rolesData as Role[];
-const permissions = permissionsData as Permission[];
-const navigation = navigationData as NavigationItem[];
-
 const normalize = (value: string): string => value.trim().toLowerCase();
+
+const buildSession = (
+  user: UserRecord,
+  org: Organization,
+  roles: Role[],
+  permissions: Permission[],
+  navigation: AuthSession['navigation'],
+): AuthSession => {
+  const userRoles = roles.filter(
+    (role) => role.orgId === org.id && user.roleIds.includes(role.id),
+  );
+  const permissionIds = new Set(userRoles.flatMap((role) => role.permissionIds));
+  const resolvedPermissions = permissions.filter((permission) => permissionIds.has(permission.id));
+  const { token, refreshToken, expiresAt } = createMockJwt(user.id, org.id);
+
+  return {
+    accessToken: token,
+    refreshToken,
+    tokenType: AUTH_CONFIG.tokenType,
+    expiresAt,
+    org,
+    user: {
+      id: user.id,
+      orgId: user.orgId,
+      orgCode: user.orgCode,
+      email: user.email,
+      name: user.name,
+      title: user.title,
+      department: user.department,
+      status: user.status,
+      isDeleted: user.isDeleted,
+      roles: userRoles.map((role) => role.name),
+    },
+    roles: userRoles,
+    permissions: resolvedPermissions,
+    navigation: filterNavigationByPermissions(navigation, resolvedPermissions),
+  };
+};
 
 export const authService = {
   getDemoCredentials: () => authData.demoCredentials,
 
   login: async (credentials: LoginCredentials): Promise<AuthSession> => {
-    await new Promise((resolve) => {
-      window.setTimeout(resolve, 250);
-    });
-
-    const org = organizations.find(
+    const database = await mockDbService.getDatabase();
+    const org = database.organizations.find(
       (candidate) => normalize(candidate.code) === normalize(credentials.org_code),
     );
 
@@ -35,9 +59,10 @@ export const authService = {
       throw new Error('Organization was not found or is not active.');
     }
 
-    const user = users.find(
+    const user = database.users.find(
       (candidate) =>
         candidate.orgId === org.id &&
+        !candidate.isDeleted &&
         normalize(candidate.email) === normalize(credentials.email) &&
         candidate.password === credentials.password,
     );
@@ -46,31 +71,20 @@ export const authService = {
       throw new Error('Invalid credentials for this organization.');
     }
 
-    const userRoles = roles.filter(
-      (role) => role.orgId === org.id && user.roleIds.includes(role.id),
-    );
-    const permissionIds = new Set(userRoles.flatMap((role) => role.permissionIds));
-    const resolvedPermissions = permissions.filter((permission) => permissionIds.has(permission.id));
-    const { token, expiresAt } = createMockJwt(user.id, org.id);
+    return buildSession(user, org, database.roles, database.permissions, database.navigation);
+  },
 
-    return {
-      accessToken: token,
-      tokenType: AUTH_CONFIG.tokenType,
-      expiresAt,
-      org,
-      user: {
-        id: user.id,
-        orgId: user.orgId,
-        orgCode: user.orgCode,
-        email: user.email,
-        name: user.name,
-        title: user.title,
-        status: user.status,
-        roles: userRoles.map((role) => role.name),
-      },
-      roles: userRoles,
-      permissions: resolvedPermissions,
-      navigation: filterNavigationByPermissions(navigation, resolvedPermissions),
-    };
+  refreshCurrentUserPermissions: async (session: AuthSession): Promise<AuthSession | null> => {
+    const database = await mockDbService.getDatabase();
+    const org = database.organizations.find((candidate) => candidate.id === session.org.id);
+    const user = database.users.find(
+      (candidate) => candidate.id === session.user.id && !candidate.isDeleted,
+    );
+
+    if (!org || !user || user.status !== 'active') {
+      return null;
+    }
+
+    return buildSession(user, org, database.roles, database.permissions, database.navigation);
   },
 };

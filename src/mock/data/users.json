@@ -1,25 +1,42 @@
 [
   {
+    "id": "usr-platform-admin",
+    "orgId": "org-platform",
+    "orgCode": "PLATFORM",
+    "email": "super.admin@platform.com",
+    "password": "Password@123",
+    "name": "Platform Super Admin",
+    "title": "Platform Super Admin",
+    "department": "Platform",
+    "status": "active",
+    "roleIds": ["role-platform-super-admin"],
+    "isDeleted": false
+  },
+  {
     "id": "usr-acme-admin",
     "orgId": "org-acme",
-    "orgCode": "ACME",
+    "orgCode": "ACME_BANK",
     "email": "admin@example.com",
     "password": "Password@123",
     "name": "Avery Stone",
-    "title": "Platform Owner",
+    "title": "Organization Admin",
+    "department": "Identity",
     "status": "active",
-    "roleIds": ["role-acme-owner"]
+    "roleIds": ["role-acme-owner"],
+    "isDeleted": false
   },
   {
-    "id": "usr-acme-agent",
+    "id": "usr-acme-limited",
     "orgId": "org-acme",
-    "orgCode": "ACME",
-    "email": "agent@example.com",
+    "orgCode": "ACME_BANK",
+    "email": "limited@example.com",
     "password": "Password@123",
     "name": "Mira Patel",
-    "title": "Support Lead",
+    "title": "Limited User",
+    "department": "Support",
     "status": "active",
-    "roleIds": ["role-acme-support"]
+    "roleIds": ["role-acme-support"],
+    "isDeleted": false
   },
   {
     "id": "usr-globex-admin",
@@ -29,8 +46,10 @@
     "password": "Password@123",
     "name": "Jordan Lee",
     "title": "Security Administrator",
+    "department": "Security",
     "status": "active",
-    "roleIds": ["role-globex-admin"]
+    "roleIds": ["role-globex-admin"],
+    "isDeleted": false
   },
   {
     "id": "usr-globex-reader",
@@ -40,7 +59,9 @@
     "password": "Password@123",
     "name": "Sam Rivera",
     "title": "Compliance Analyst",
+    "department": "Compliance",
     "status": "active",
-    "roleIds": ["role-globex-reader"]
+    "roleIds": ["role-globex-reader"],
+    "isDeleted": false
   }
 ]

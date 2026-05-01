@@ -1,34 +1,60 @@
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import PeopleIcon from '@mui/icons-material/People';
 import SecurityIcon from '@mui/icons-material/Security';
-import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import { Card, CardContent, Grid, Stack, Typography } from '@mui/material';
+import { useEffect, useState } from 'react';
+import { dashboardService, type DashboardMetrics } from '@/features/dashboard/dashboard.service';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 
-const metricIcons = [SpaceDashboardIcon, PeopleIcon, SecurityIcon, CheckCircleIcon] as const;
+const metricIcons = [PeopleIcon, SecurityIcon, ConfirmationNumberIcon, AssessmentIcon] as const;
 
 export const DashboardPage = () => {
   const session = useAuthStore((state) => state.session);
-  const metrics = [
-    { label: 'Navigation items', value: session?.navigation.length ?? 0 },
-    { label: 'Assigned roles', value: session?.roles.length ?? 0 },
-    { label: 'Permissions', value: session?.permissions.length ?? 0 },
-    { label: 'Tenant status', value: session?.org.status ?? 'unknown' },
+  const [metrics, setMetrics] = useState<DashboardMetrics>({
+    users: 0,
+    roles: 0,
+    tickets: 0,
+    reports: 0,
+  });
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    void dashboardService.getMetrics(session.org.id).then(setMetrics);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.org.id]);
+
+  const cards = [
+    { label: 'Users', value: metrics.users },
+    { label: 'Roles', value: metrics.roles },
+    { label: 'Tickets', value: metrics.tickets },
+    { label: 'Reports', value: metrics.reports },
   ];
 
   return (
     <>
       <PageHeader
         title="Dashboard"
-        subtitle="Tenant-scoped overview generated from the simulated login payload."
+        subtitle="Live counts from the local mock database for the current tenant."
       />
       <Grid container spacing={2}>
-        {metrics.map((metric, index) => {
+        {cards.map((metric, index) => {
           const Icon = metricIcons[index];
           return (
             <Grid key={metric.label} size={{ xs: 12, sm: 6, lg: 3 }}>
-              <Card elevation={0} sx={{ border: 1, borderColor: 'divider' }}>
+              <Card
+                elevation={0}
+                sx={{
+                  border: 1,
+                  borderColor: 'divider',
+                  transition: 'transform 160ms ease, box-shadow 160ms ease',
+                  '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 },
+                }}
+              >
                 <CardContent>
                   <Stack direction="row" spacing={2} alignItems="center">
                     <Icon color="primary" />

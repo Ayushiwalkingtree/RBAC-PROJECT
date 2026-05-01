@@ -12,6 +12,7 @@ type AuthState = {
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => void;
   clearError: () => void;
+  refreshSession: () => Promise<void>;
 };
 
 export const useAuthStore = create<AuthState>()(
@@ -38,6 +39,20 @@ export const useAuthStore = create<AuthState>()(
       },
       logout: () => set({ session: null, isAuthenticated: false, error: null }),
       clearError: () => set({ error: null }),
+      refreshSession: async () => {
+        const currentSession = useAuthStore.getState().session;
+        if (!currentSession) {
+          return;
+        }
+
+        const refreshedSession = await authService.refreshCurrentUserPermissions(currentSession);
+        if (!refreshedSession) {
+          set({ session: null, isAuthenticated: false });
+          return;
+        }
+
+        set({ session: refreshedSession, isAuthenticated: true });
+      },
     }),
     {
       name: STORAGE_KEYS.auth,

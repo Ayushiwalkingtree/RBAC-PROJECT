@@ -3,6 +3,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import { useMemo, type PropsWithChildren } from 'react';
 import { createAppTheme } from '@/shared/theme/createAppTheme';
 import { useThemeStore } from '@/shared/theme/theme.store';
+import { AppSnackbarProvider } from '@/shared/components/AppSnackbar';
 
 export const AppProviders = ({ children }: PropsWithChildren) => {
   const mode = useThemeStore((state) => state.mode);
@@ -11,7 +12,7 @@ export const AppProviders = ({ children }: PropsWithChildren) => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      {children}
+      <AppSnackbarProvider>{children}</AppSnackbarProvider>
     </ThemeProvider>
   );
 };

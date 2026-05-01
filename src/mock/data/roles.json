@@ -1,79 +1,82 @@
 [
   {
+    "id": "role-platform-super-admin",
+    "orgId": "org-platform",
+    "code": "PLATFORM_SUPER_ADMIN",
+    "name": "Platform Super Admin",
+    "description": "Full access to platform tenant data",
+    "permissionIds": [
+      "perm-dashboard-view", "perm-dashboard-read",
+      "perm-users-view", "perm-users-read", "perm-users-create", "perm-users-update", "perm-users-delete",
+      "perm-roles-view", "perm-roles-read", "perm-roles-create", "perm-roles-update", "perm-roles-delete",
+      "perm-permissions-view", "perm-permissions-assign",
+      "perm-tickets-view", "perm-tickets-read", "perm-tickets-create", "perm-tickets-update", "perm-tickets-delete", "perm-tickets-assign",
+      "perm-reports-view", "perm-reports-read", "perm-reports-export",
+      "perm-settings-view", "perm-settings-manage"
+    ],
+    "isSystem": true
+  },
+  {
     "id": "role-acme-owner",
     "orgId": "org-acme",
-    "name": "Tenant Owner",
-    "description": "Full operational access for Acme",
+    "code": "ORG_ADMIN",
+    "name": "Organization Admin",
+    "description": "Full operational access for Acme Bank",
     "permissionIds": [
-      "perm-dashboard-view",
-      "perm-users-view",
-      "perm-users-create",
-      "perm-users-update",
-      "perm-users-delete",
-      "perm-roles-view",
-      "perm-roles-create",
-      "perm-roles-update",
-      "perm-roles-delete",
-      "perm-permissions-view",
-      "perm-permissions-assign",
-      "perm-tickets-view",
-      "perm-tickets-create",
-      "perm-tickets-update",
-      "perm-reports-view",
-      "perm-reports-export",
-      "perm-settings-view",
-      "perm-settings-manage"
-    ]
+      "perm-dashboard-view", "perm-dashboard-read",
+      "perm-users-view", "perm-users-read", "perm-users-create", "perm-users-update", "perm-users-delete",
+      "perm-roles-view", "perm-roles-read", "perm-roles-create", "perm-roles-update", "perm-roles-delete",
+      "perm-permissions-view", "perm-permissions-assign",
+      "perm-tickets-view", "perm-tickets-read", "perm-tickets-create", "perm-tickets-update", "perm-tickets-delete", "perm-tickets-assign",
+      "perm-reports-view", "perm-reports-read", "perm-reports-export",
+      "perm-settings-view", "perm-settings-manage"
+    ],
+    "isSystem": true
   },
   {
     "id": "role-acme-support",
     "orgId": "org-acme",
-    "name": "Support Lead",
-    "description": "Ticket operations with read-only access to admin areas",
+    "code": "LIMITED_USER",
+    "name": "Limited User",
+    "description": "Ticket operations with read-only access to selected areas",
     "permissionIds": [
-      "perm-dashboard-view",
-      "perm-users-view",
-      "perm-roles-view",
-      "perm-permissions-view",
-      "perm-tickets-view",
-      "perm-tickets-create",
-      "perm-tickets-update",
-      "perm-reports-view",
-      "perm-settings-view"
-    ]
+      "perm-dashboard-view", "perm-dashboard-read",
+      "perm-users-view", "perm-users-read",
+      "perm-tickets-view", "perm-tickets-read", "perm-tickets-create", "perm-tickets-update",
+      "perm-reports-view", "perm-reports-read"
+    ],
+    "isSystem": true
   },
   {
     "id": "role-globex-admin",
     "orgId": "org-globex",
+    "code": "SECURITY_ADMIN",
     "name": "Security Administrator",
     "description": "Globex identity and audit administration",
     "permissionIds": [
-      "perm-dashboard-view",
-      "perm-users-view",
-      "perm-users-create",
-      "perm-users-update",
-      "perm-roles-view",
-      "perm-roles-update",
-      "perm-permissions-view",
-      "perm-permissions-assign",
-      "perm-reports-view",
-      "perm-reports-export",
-      "perm-settings-view",
-      "perm-settings-manage"
-    ]
+      "perm-dashboard-view", "perm-dashboard-read",
+      "perm-users-view", "perm-users-read", "perm-users-create", "perm-users-update",
+      "perm-roles-view", "perm-roles-read", "perm-roles-update",
+      "perm-permissions-view", "perm-permissions-assign",
+      "perm-reports-view", "perm-reports-read", "perm-reports-export",
+      "perm-settings-view", "perm-settings-manage"
+    ],
+    "isSystem": true
   },
   {
     "id": "role-globex-reader",
     "orgId": "org-globex",
+    "code": "COMPLIANCE_READER",
     "name": "Compliance Reader",
     "description": "Read-only compliance visibility",
     "permissionIds": [
-      "perm-dashboard-view",
-      "perm-users-view",
-      "perm-roles-view",
+      "perm-dashboard-view", "perm-dashboard-read",
+      "perm-users-view", "perm-users-read",
+      "perm-roles-view", "perm-roles-read",
       "perm-permissions-view",
-      "perm-reports-view",
+      "perm-reports-view", "perm-reports-read",
       "perm-settings-view"
-    ]
+    ],
+    "isSystem": true
   }
 ]

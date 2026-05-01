@@ -16,8 +16,10 @@ export type UserRecord = {
   password: string;
   name: string;
   title: string;
+  department: string;
   status: 'active' | 'invited' | 'disabled';
   roleIds: string[];
+  isDeleted?: boolean;
 };
 
 export type AuthUser = Omit<UserRecord, 'password' | 'roleIds'> & {
@@ -26,6 +28,7 @@ export type AuthUser = Omit<UserRecord, 'password' | 'roleIds'> & {
 
 export type AuthSession = {
   accessToken: string;
+  refreshToken: string;
   tokenType: string;
   expiresAt: string;
   user: AuthUser;

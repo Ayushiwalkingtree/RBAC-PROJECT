@@ -10,15 +10,18 @@ export type Permission = {
 export type Role = {
   id: string;
   orgId: string;
+  code: string;
   name: string;
   description: string;
   permissionIds: string[];
+  isSystem?: boolean;
 };
 
 export type Resource = {
   id: ResourceKey;
   label: string;
   description: string;
+  group: string;
 };
 
 export type PermissionRequirement = {

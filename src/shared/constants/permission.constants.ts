@@ -10,6 +10,7 @@ export const RESOURCE_KEYS = {
 
 export const ACTION_KEYS = {
   view: 'view',
+  read: 'read',
   create: 'create',
   update: 'update',
   delete: 'delete',

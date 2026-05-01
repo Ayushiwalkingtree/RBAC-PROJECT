@@ -1,14 +1,20 @@
 [
   {
     "id": "org-acme",
-    "code": "ACME",
-    "name": "Acme Operations",
+    "code": "ACME_BANK",
+    "name": "Acme Bank",
     "status": "active"
   },
   {
     "id": "org-globex",
     "code": "GLOBEX",
     "name": "Globex Enterprise",
+    "status": "active"
+  },
+  {
+    "id": "org-platform",
+    "code": "PLATFORM",
+    "name": "Platform Operations",
     "status": "active"
   }
 ]
