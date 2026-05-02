@@ -122,6 +122,9 @@ export const RESOURCE_KEYS = {
   permissionGrantApi: 'PERM_GRANT_API',
   resourceRegistryMenu: 'RESOURCE_REGISTRY_MENU',
   resourceManageApi: 'RESOURCE_MANAGE_API',
+  orgSettings: 'ORG_SETTINGS',
+  auditLogsMenu: 'AUDIT_LOGS_MENU',
+  auditLogApi: 'AUDIT_LOG_API',
   settingsMenu: 'SETTINGS_MENU',
   settingsManageApi: 'SETTINGS_MANAGE_API',
   navPreviewMenu: 'NAV_PREVIEW_MENU',
@@ -209,7 +212,14 @@ export const RESOURCE_PERMISSION_RULES = {
   },
   settings: {
     menuView: { resource: RESOURCE_KEYS.settingsMenu, permission: PERMISSION_KEYS.view },
-    manage: [{ resource: RESOURCE_KEYS.settingsManageApi, permission: PERMISSION_KEYS.update }],
+    manage: [
+      { resource: RESOURCE_KEYS.settingsManageApi, permission: PERMISSION_KEYS.update },
+      { resource: RESOURCE_KEYS.orgSettings, permission: PERMISSION_KEYS.update },
+    ],
+  },
+  auditLogs: {
+    menuView: { resource: RESOURCE_KEYS.auditLogsMenu, permission: PERMISSION_KEYS.view },
+    read: [{ resource: RESOURCE_KEYS.auditLogApi, permission: PERMISSION_KEYS.read }],
   },
 } as const;
 

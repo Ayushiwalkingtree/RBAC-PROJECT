@@ -89,7 +89,10 @@ export const PermissionsMatrixPage = () => {
 
     setIsSaving(true);
     try {
-      await permissionService.updateRolePermissions(selectedRoleId, draftPermissions);
+      await permissionService.updateRolePermissions(selectedRoleId, draftPermissions, {
+        userId: session?.user.id,
+        email: session?.user.email,
+      });
       await loadMatrix();
       await refreshSession();
       showToast('Permissions saved.');

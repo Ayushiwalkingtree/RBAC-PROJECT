@@ -10,7 +10,7 @@ type AuthState = {
   error: string | null;
   isAuthenticated: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   clearError: () => void;
   refreshSession: () => Promise<void>;
 };
@@ -37,7 +37,11 @@ export const useAuthStore = create<AuthState>()(
           throw error;
         }
       },
-      logout: () => set({ session: null, isAuthenticated: false, error: null }),
+      logout: async () => {
+        const currentSession = useAuthStore.getState().session;
+        await authService.logout(currentSession);
+        set({ session: null, isAuthenticated: false, error: null });
+      },
       clearError: () => set({ error: null }),
       refreshSession: async () => {
         const currentSession = useAuthStore.getState().session;
@@ -45,7 +49,7 @@ export const useAuthStore = create<AuthState>()(
           return;
         }
 
-        const refreshedSession = await authService.refreshCurrentUserPermissions(currentSession);
+        const refreshedSession = await authService.refreshCurrentUserPermissions(currentSession, true);
         if (!refreshedSession) {
           set({ session: null, isAuthenticated: false });
           return;

@@ -76,10 +76,20 @@ export const RolesPage = () => {
     setIsSubmitting(true);
     try {
       if (editingRole) {
-        await roleService.updateRole(editingRole.id, { ...values, orgId: session.org.id });
+        await roleService.updateRole(editingRole.id, {
+          ...values,
+          orgId: session.org.id,
+          actorUserId: session.user.id,
+          actorEmail: session.user.email,
+        });
         showToast('Role updated.');
       } else {
-        await roleService.createRole({ ...values, orgId: session.org.id });
+        await roleService.createRole({
+          ...values,
+          orgId: session.org.id,
+          actorUserId: session.user.id,
+          actorEmail: session.user.email,
+        });
         showToast('Role created.');
       }
 

@@ -13,7 +13,7 @@ export const AuthGuard = () => {
   }
 
   if (new Date(session.expiresAt).getTime() <= Date.now()) {
-    logout();
+    void logout();
     return <Navigate to={APP_CONFIG.loginRoute} replace state={{ from: location }} />;
   }
 

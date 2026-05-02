@@ -1,10 +1,16 @@
-import { mockDbService } from '@/mock/services/mockDb.service';
+import { appendAuditLog, mockDbService } from '@/mock/services/mockDb.service';
 import { createId } from '@/shared/utils/id';
 import type { ResourceFormValues } from '@/features/resources/resource.schema';
 import { normalizeResourceFormValues } from '@/features/resources/resourceForm.utils';
 import { RESOURCE_TYPES } from '@/shared/constants/permission.constants';
 import { slugifyResourceName } from '@/shared/services/navigation.service';
 import type { ResourceRecord } from '@/shared/types/rbac.types';
+
+type ResourceActor = {
+  isPlatformSuperAdmin: boolean;
+  userId?: string;
+  email?: string;
+};
 
 const normalizeKey = (value: string): string => value.trim().toUpperCase();
 
@@ -67,7 +73,11 @@ export const resourceService = {
     return database.resources;
   },
 
-  createResource: async (values: ResourceFormValues): Promise<ResourceRecord> => {
+  createResource: async (values: ResourceFormValues, actor?: ResourceActor): Promise<ResourceRecord> => {
+    if (!actor?.isPlatformSuperAdmin) {
+      throw new Error('Only platform super admin can manage resources.');
+    }
+
     let createdResource: ResourceRecord | null = null;
     await mockDbService.updateDatabase((database) => {
       const resourceKey = normalizeKey(normalizeResourceFormValues(values).resource_key ?? '');
@@ -77,7 +87,19 @@ export const resourceService = {
       }
 
       createdResource = toResourceRecord(values);
-      return { ...database, resources: [...database.resources, createdResource] };
+      return appendAuditLog(
+        { ...database, resources: [...database.resources, createdResource] },
+        {
+          orgId: 'org-platform',
+          action: 'RESOURCE_CREATED',
+          actorUserId: actor.userId,
+          actorEmail: actor.email,
+          resourceType: 'RESOURCE',
+          resourceId: createdResource.id,
+          resourceKey: createdResource.resourceKey,
+          message: `${createdResource.resourceKey} was created.`,
+        },
+      );
     });
 
     if (!createdResource) {
@@ -87,7 +109,11 @@ export const resourceService = {
     return createdResource;
   },
 
-  updateResource: async (resourceId: string, values: ResourceFormValues): Promise<ResourceRecord> => {
+  updateResource: async (resourceId: string, values: ResourceFormValues, actor?: ResourceActor): Promise<ResourceRecord> => {
+    if (!actor?.isPlatformSuperAdmin) {
+      throw new Error('Only platform super admin can manage resources.');
+    }
+
     let updatedResource: ResourceRecord | null = null;
     await mockDbService.updateDatabase((database) => {
       const resourceKey = normalizeKey(normalizeResourceFormValues(values).resource_key ?? '');
@@ -98,7 +124,7 @@ export const resourceService = {
         throw new Error('Resource key already exists.');
       }
 
-      return {
+      const nextDatabase = {
         ...database,
         resources: database.resources.map((resource) => {
           if (resource.id !== resourceId) {
@@ -109,6 +135,17 @@ export const resourceService = {
           return updatedResource;
         }),
       };
+
+      return appendAuditLog(nextDatabase, {
+        orgId: 'org-platform',
+        action: 'RESOURCE_UPDATED',
+        actorUserId: actor.userId,
+        actorEmail: actor.email,
+        resourceType: 'RESOURCE',
+        resourceId,
+        resourceKey: updatedResource?.resourceKey,
+        message: `${updatedResource?.resourceKey ?? resourceId} was updated.`,
+      });
     });
 
     if (!updatedResource) {
@@ -118,14 +155,18 @@ export const resourceService = {
     return updatedResource;
   },
 
-  deleteResource: async (resourceId: string): Promise<void> => {
+  deleteResource: async (resourceId: string, actor?: ResourceActor): Promise<void> => {
+    if (!actor?.isPlatformSuperAdmin) {
+      throw new Error('Only platform super admin can manage resources.');
+    }
+
     await mockDbService.updateDatabase((database) => {
       const resource = database.resources.find((candidate) => candidate.id === resourceId);
       if (!resource) {
         throw new Error('Resource was not found.');
       }
 
-      return {
+      return appendAuditLog({
         ...database,
         resources: database.resources.filter((candidate) => candidate.id !== resourceId),
         roles: database.roles.map((role) => {
@@ -133,7 +174,16 @@ export const resourceService = {
           delete nextPermissions[resource.resourceKey];
           return { ...role, permissions: nextPermissions };
         }),
-      };
+      }, {
+        orgId: 'org-platform',
+        action: 'RESOURCE_UPDATED',
+        actorUserId: actor.userId,
+        actorEmail: actor.email,
+        resourceType: 'RESOURCE',
+        resourceId,
+        resourceKey: resource.resourceKey,
+        message: `${resource.resourceKey} was deleted.`,
+      });
     });
   },
 

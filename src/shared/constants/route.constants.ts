@@ -2,12 +2,15 @@ import { PERMISSION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.co
 
 export const ROUTES = {
   login: '/login',
+  signup: '/signup',
+  verifyEmail: '/verify-email',
   dashboard: '/dashboard',
   users: '/users',
   roles: '/roles',
   permissions: '/permissions',
   tickets: '/tickets',
   reports: '/reports',
+  auditLogs: '/audit-logs',
   settings: '/settings',
   resourceRegistry: '/resource-registry',
   navPreview: '/nav-preview',
@@ -20,6 +23,7 @@ export const ROUTE_PERMISSIONS = {
   [ROUTES.permissions]: { resource: RESOURCE_KEYS.permissionGrantApi, permission: PERMISSION_KEYS.configure },
   [ROUTES.tickets]: { resource: RESOURCE_KEYS.loanMenu, permission: PERMISSION_KEYS.view },
   [ROUTES.reports]: { resource: RESOURCE_KEYS.reportsMenu, permission: PERMISSION_KEYS.view },
+  [ROUTES.auditLogs]: { resource: RESOURCE_KEYS.auditLogApi, permission: PERMISSION_KEYS.read },
   [ROUTES.settings]: { resource: RESOURCE_KEYS.settingsMenu, permission: PERMISSION_KEYS.view },
   [ROUTES.resourceRegistry]: {
     resource: RESOURCE_KEYS.resourceRegistryMenu,

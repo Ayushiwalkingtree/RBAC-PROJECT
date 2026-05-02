@@ -12,6 +12,7 @@ const encodeBase64Url = (value: string): string =>
 
 export const createMockJwt = (userId: string, orgId: string): { token: string; refreshToken: string; expiresAt: string } => {
   const expiresAt = new Date(Date.now() + AUTH_CONFIG.tokenTtlMinutes * 60 * 1000);
+  const refreshExpiresAt = new Date(Date.now() + AUTH_CONFIG.refreshTokenTtlDays * 24 * 60 * 60 * 1000);
   const header = encodeBase64Url(JSON.stringify({ alg: 'none', typ: 'JWT' }));
   const payload: TokenPayload = {
     sub: userId,
@@ -23,7 +24,7 @@ export const createMockJwt = (userId: string, orgId: string): { token: string; r
   return {
     token: `${header}.${encodeBase64Url(JSON.stringify(payload))}.mock-signature`,
     refreshToken: `${header}.${encodeBase64Url(
-      JSON.stringify({ ...payload, typ: 'refresh', exp: payload.exp + 86400 }),
+      JSON.stringify({ ...payload, typ: 'refresh', exp: Math.floor(refreshExpiresAt.getTime() / 1000) }),
     )}.mock-refresh-signature`,
     expiresAt: expiresAt.toISOString(),
   };

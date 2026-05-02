@@ -32,8 +32,7 @@ import { useAuthStore } from '@/features/auth/store/auth.store';
 import { ResourceForm } from '@/features/resources/ResourceForm';
 import { emptyResourceFormValues, valuesFromResource } from '@/features/resources/resourceForm.utils';
 import { resourceService } from '@/features/resources/resource.service';
-import { PERMISSION_KEYS, RESOURCE_KEYS, RESOURCE_TYPES } from '@/shared/constants/permission.constants';
-import { usePermission } from '@/shared/hooks/usePermission';
+import { RESOURCE_TYPES } from '@/shared/constants/permission.constants';
 import {
   buildBusinessPermissionRows,
   buildTechnicalPermissionRows,
@@ -51,12 +50,10 @@ const navigableTypes = new Set<string>([
 ]);
 
 const canManageResources = (
-  can: ReturnType<typeof usePermission>['can'],
   sessionOrgCode?: string,
+  roles: string[] = [],
 ): boolean =>
-  sessionOrgCode === 'PLATFORM' ||
-  (can(RESOURCE_KEYS.resourceRegistryMenu, PERMISSION_KEYS.view) &&
-    can(RESOURCE_KEYS.resourceManageApi, PERMISSION_KEYS.create));
+  sessionOrgCode === 'PLATFORM' && roles.some((role) => role.toUpperCase().includes('SUPER ADMIN'));
 
 type SortableNavigationRowProps = {
   resource: ResourceRecord;
@@ -116,7 +113,6 @@ const SortableNavigationRow = ({ resource, parentOptions, onParentChange }: Sort
 export const ResourceRegistryPage = () => {
   const session = useAuthStore((state) => state.session);
   const refreshSession = useAuthStore((state) => state.refreshSession);
-  const { can } = usePermission();
   const { showToast } = useToast();
   const [resources, setResources] = useState<ResourceRecord[]>([]);
   const [selectedRowId, setSelectedRowId] = useState('');
@@ -129,7 +125,9 @@ export const ResourceRegistryPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  const canManage = canManageResources(can, session?.org.code);
+  const isPlatformSuperAdmin =
+    session?.org.code === 'PLATFORM' && session.user.roles.some((role) => role.toUpperCase().includes('SUPER ADMIN'));
+  const canManage = canManageResources(session?.org.code, session?.user.roles);
   const isPlatform = session?.org.code === 'PLATFORM';
   const parentResources = resources.filter(
     (resource) => resource.resourceType === RESOURCE_TYPES.menu && resource.isActive,
@@ -189,13 +187,23 @@ export const ResourceRegistryPage = () => {
   };
 
   const handleSubmit = async (values: ResourceFormValues) => {
+    if (!session) return;
+
     setIsSubmitting(true);
     try {
       if (editingResource) {
-        await resourceService.updateResource(editingResource.id, values);
+        await resourceService.updateResource(editingResource.id, values, {
+          isPlatformSuperAdmin,
+          userId: session.user.id,
+          email: session.user.email,
+        });
         showToast('Resource updated.');
       } else {
-        const created = await resourceService.createResource(values);
+        const created = await resourceService.createResource(values, {
+          isPlatformSuperAdmin,
+          userId: session.user.id,
+          email: session.user.email,
+        });
         setSelectedRowId(showTechnicalResources ? `technical-${created.resourceKey}` : `resource-${created.resourceKey}`);
         showToast('Resource created.');
       }
@@ -215,7 +223,11 @@ export const ResourceRegistryPage = () => {
 
     setIsSubmitting(true);
     try {
-      await resourceService.deleteResource(deletingResource.id);
+      await resourceService.deleteResource(deletingResource.id, {
+        isPlatformSuperAdmin,
+        userId: session?.user.id,
+        email: session?.user.email,
+      });
       setSelectedRowId('');
       await loadResources();
       await refreshSession();

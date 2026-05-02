@@ -1,4 +1,4 @@
-import { mockDbService } from '@/mock/services/mockDb.service';
+import { appendAuditLog, mockDbService } from '@/mock/services/mockDb.service';
 import { createId } from '@/shared/utils/id';
 import type { Role } from '@/shared/types/rbac.types';
 
@@ -9,6 +9,8 @@ export type RoleInput = {
   role_code: string;
   role_name: string;
   description: string;
+  actorUserId?: string;
+  actorEmail?: string;
 };
 
 export const roleService = {
@@ -38,7 +40,18 @@ export const roleService = {
         isSystem: false,
       };
 
-      return { ...database, roles: [...database.roles, createdRole] };
+      return appendAuditLog(
+        { ...database, roles: [...database.roles, createdRole] },
+        {
+          orgId: input.orgId,
+          action: 'ROLE_CREATED',
+          actorUserId: input.actorUserId,
+          actorEmail: input.actorEmail,
+          resourceType: 'ROLE',
+          resourceId: createdRole.id,
+          message: `${createdRole.code} role was created.`,
+        },
+      );
     });
 
     if (!createdRole) {

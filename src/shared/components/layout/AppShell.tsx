@@ -238,8 +238,8 @@ export const AppShell = ({ children }: PropsWithChildren) => {
     return active;
   }, [location.pathname, session?.navigation]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate(APP_CONFIG.loginRoute, { replace: true });
   };
 
@@ -460,7 +460,7 @@ export const AppShell = ({ children }: PropsWithChildren) => {
             </IconButton>
           </Tooltip>
           <Tooltip title="Sign out">
-            <IconButton onClick={handleLogout} aria-label="Sign out">
+            <IconButton onClick={() => void handleLogout()} aria-label="Sign out">
               <LogoutIcon />
             </IconButton>
           </Tooltip>

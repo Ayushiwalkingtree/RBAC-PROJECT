@@ -2,6 +2,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
+import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 import ToggleOnIcon from '@mui/icons-material/ToggleOn';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -132,6 +133,8 @@ export const UsersPage = () => {
           orgId: session.org.id,
           orgCode: session.org.code,
           password: values.password,
+          actorUserId: session.user.id,
+          actorEmail: session.user.email,
         });
         showToast('User created.');
       }
@@ -158,7 +161,10 @@ export const UsersPage = () => {
 
     setIsSubmitting(true);
     try {
-      await userService.assignUserRoles(roleAssignmentUser.id, roleAssignmentDraft);
+      await userService.assignUserRoles(roleAssignmentUser.id, roleAssignmentDraft, {
+        userId: session?.user.id,
+        email: session?.user.email,
+      });
       await loadData();
       await refreshSession();
       showToast('Roles assigned.');
@@ -178,6 +184,17 @@ export const UsersPage = () => {
       showToast(user.status === 'active' ? 'User deactivated.' : 'User activated.');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Unable to update user status.', 'error');
+    }
+  };
+
+  const handleVerifyEmail = async (user: UserRecord) => {
+    try {
+      await userService.verifyUserEmail(user.id);
+      await loadData();
+      await refreshSession();
+      showToast('Email verified.');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to verify email.', 'error');
     }
   };
 
@@ -235,6 +252,17 @@ export const UsersPage = () => {
             },
             { id: 'status', label: 'Status', render: (user) => user.status },
             {
+              id: 'emailVerified',
+              label: 'Email',
+              render: (user) => (
+                <Chip
+                  label={user.isEmailVerified ? 'Verified' : 'Unverified'}
+                  size="small"
+                  color={user.isEmailVerified ? 'success' : 'warning'}
+                />
+              ),
+            },
+            {
               id: 'actions',
               label: 'Actions',
               render: (user) => (
@@ -263,6 +291,17 @@ export const UsersPage = () => {
                   )}
                   {canUpdateUser && (
                     <>
+                    {!user.isEmailVerified && (
+                      <Tooltip title="Mock verify email">
+                        <IconButton
+                          size="small"
+                          aria-label="Verify email"
+                          onClick={() => void handleVerifyEmail(user)}
+                        >
+                          <MarkEmailReadIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     <Tooltip title={user.status === 'active' ? 'Deactivate user' : 'Activate user'}>
                       <IconButton
                         size="small"
