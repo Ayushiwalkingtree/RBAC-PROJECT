@@ -15,6 +15,7 @@ class Role(Base, AuditColumns):
     role_name: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text)
     is_system: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     organization = relationship("Organization", back_populates="roles")
     permissions = relationship("RolePermission", back_populates="role", uselist=False)
@@ -24,7 +25,8 @@ class RolePermission(Base, AuditColumns):
     __tablename__ = "at_role_permission"
 
     id: Mapped[int_pk]
-    role_id: Mapped[int] = mapped_column(ForeignKey("at_role.id"), unique=True, index=True)
+    role_id: Mapped[int] = mapped_column("at_role_id", ForeignKey("at_role.id"), unique=True, index=True)
+    at_organization_id: Mapped[int] = mapped_column(ForeignKey("at_organization.id"), index=True)
     permissions_json: Mapped[dict[str, list[str]]] = mapped_column(JSONB, default=dict)
 
     role = relationship("Role", back_populates="permissions")

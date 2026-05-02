@@ -65,14 +65,23 @@ class AuthService:
                 at_organization_id=org.id,
                 user_id=user.id,
                 token_hash=hash_token(refresh_token),
+                issued_at=utcnow(),
                 expires_at=datetime.fromisoformat(refresh_expires_at),
+                device_info=user_agent,
                 user_agent=user_agent,
             )
         )
         user.failed_attempts = 0
         user.locked_until = None
         user.last_login_at = utcnow()
-        await self.audit.write(org.id, "USER_LOGIN", "SESSION", f"{user.email} logged in", actor_user_id=user.id)
+        await self.audit.write(
+            org.id,
+            "USER_LOGIN",
+            "SESSION",
+            f"{user.email} logged in",
+            actor_user_id=user.id,
+            user_agent=user_agent,
+        )
         await self.session.commit()
         return self._auth_response(access_token, refresh_token, expires_at, user, org, current_roles, perms, nav)
 
@@ -101,8 +110,10 @@ class AuthService:
                 at_organization_id=org.id,
                 user_id=user.id,
                 token_hash=hash_token(new_refresh),
+                issued_at=utcnow(),
                 expires_at=datetime.fromisoformat(refresh_expires_at),
                 rotated_from_id=stored.id,
+                device_info=stored.device_info or stored.user_agent,
                 user_agent=stored.user_agent,
             )
         )
@@ -124,8 +135,15 @@ class AuthService:
             access_token=access_token,
             refresh_token=refresh_token,
             expires_at=expires_at,
-            user=CurrentUser(id=user.id, email=user.email, full_name=user.full_name, is_email_verified=user.is_email_verified, is_active=user.is_active),
-            org=CurrentOrg(id=org.id, org_code=org.org_code, org_name=org.org_name),
+            user=CurrentUser(
+                id=user.id,
+                user_id=user.id,
+                email=user.email,
+                full_name=user.full_name,
+                is_email_verified=user.is_email_verified,
+                is_active=user.is_active,
+            ),
+            org=CurrentOrg(id=org.id, org_id=org.id, org_code=org.org_code, org_name=org.org_name),
             roles=roles,
             perms=perms,
             nav=nav,

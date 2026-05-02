@@ -31,7 +31,9 @@ class ResourcePermission(Base, AuditColumns):
     __tablename__ = "at_resource_permission"
 
     id: Mapped[int_pk]
-    resource_id: Mapped[int] = mapped_column(ForeignKey("at_resource.id"), unique=True, index=True)
-    permissions_json: Mapped[list[str]] = mapped_column(JSONB)
+    resource_id: Mapped[int] = mapped_column("at_resource_id", ForeignKey("at_resource.id"), unique=True, index=True)
+    resource_key: Mapped[str] = mapped_column(String(120), index=True)
+    permissions_json: Mapped[list] = mapped_column(JSONB, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     resource = relationship("Resource", back_populates="permissions")

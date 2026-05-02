@@ -18,6 +18,14 @@ class Settings(BaseModel):
     backend_cors_origins: str = Field(default="http://localhost:5173,http://127.0.0.1:5173")
     service_api_key: str = Field(default="dev-service-key")
     redis_url: str | None = None
+    email_provider: str = Field(default="console")
+    frontend_verify_email_url: str = Field(default="http://localhost:5173/verify-email")
+    smtp_host: str | None = None
+    smtp_port: int = Field(default=587)
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str = Field(default="no-reply@example.com")
+    smtp_use_tls: bool = Field(default=True)
 
     @property
     def cors_origins(self) -> list[str]:
@@ -42,6 +50,17 @@ def get_settings() -> Settings:
         ),
         service_api_key=os.getenv("SERVICE_API_KEY", "dev-service-key"),
         redis_url=os.getenv("REDIS_URL") or None,
+        email_provider=os.getenv("EMAIL_PROVIDER", "console"),
+        frontend_verify_email_url=os.getenv(
+            "FRONTEND_VERIFY_EMAIL_URL",
+            "http://localhost:5173/verify-email",
+        ),
+        smtp_host=os.getenv("SMTP_HOST") or None,
+        smtp_port=int(os.getenv("SMTP_PORT", "587")),
+        smtp_username=os.getenv("SMTP_USERNAME") or None,
+        smtp_password=os.getenv("SMTP_PASSWORD") or None,
+        smtp_from_email=os.getenv("SMTP_FROM_EMAIL", "no-reply@example.com"),
+        smtp_use_tls=os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes", "on"},
     )
 
 

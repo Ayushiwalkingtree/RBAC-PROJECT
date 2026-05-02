@@ -29,7 +29,11 @@ class AuditRepository:
         if resource_type:
             stmt = stmt.where(AuditLog.resource_type == resource_type)
         if user_id:
-            stmt = stmt.where((AuditLog.actor_user_id == user_id) | (AuditLog.target_user_id == user_id))
+            stmt = stmt.where(
+                (AuditLog.at_user_id == user_id)
+                | (AuditLog.actor_user_id == user_id)
+                | (AuditLog.target_user_id == user_id)
+            )
         if date_from:
             stmt = stmt.where(AuditLog.created_at >= datetime.combine(date_from, time.min))
         if date_to:

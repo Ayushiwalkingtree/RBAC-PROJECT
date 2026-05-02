@@ -15,7 +15,7 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { useState } from 'react';
-import { Link as RouterLink, Navigate, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, Navigate } from 'react-router-dom';
 import { authService } from '@/features/auth/services/auth.service';
 import { signupSchema, type SignupFormValues } from '@/features/auth/schemas/signup.schema';
 import { useAuthStore } from '@/features/auth/store/auth.store';
@@ -44,9 +44,9 @@ const generateOrgCode = (name: string): string =>
     .replace(/^_+|_+$/gu, '');
 
 export const SignupPage = () => {
-  const navigate = useNavigate();
   const isAuthenticated = useAuthStore((store) => store.isAuthenticated);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const { control, handleSubmit, setValue, formState } = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues,
@@ -55,17 +55,10 @@ export const SignupPage = () => {
   const onSubmit = handleSubmit(async (values) => {
     try {
       setError('');
+      setSuccessMessage('');
       const result = await authService.signupTenant(values);
       window.localStorage.setItem(STORAGE_KEYS.lastOrgCode, result.org.code);
-      navigate(result.verificationToken ? `${ROUTES.verifyEmail}?token=${encodeURIComponent(result.verificationToken)}` : ROUTES.verifyEmail, {
-        replace: true,
-        state: {
-          token: result.verificationToken,
-          email: result.user.email,
-          orgCode: result.org.code,
-          successMessage: result.message ?? 'Organization created. First administrator created as Organization Admin.',
-        },
-      });
+      setSuccessMessage(result.message ?? 'Organization created. Please check your email to verify your account.');
     } catch (signupError) {
       setError(signupError instanceof Error ? signupError.message : 'Unable to create organization.');
     }
@@ -87,6 +80,18 @@ export const SignupPage = () => {
               </Typography>
             </Box>
             <Alert severity="info">Organization codes are global; emails are unique only inside an organization.</Alert>
+            {successMessage && (
+              <Alert
+                severity="success"
+                action={(
+                  <Button component={RouterLink} to={ROUTES.login} color="inherit" size="small">
+                    Back to sign in
+                  </Button>
+                )}
+              >
+                Organization created. Please check your email to verify your account.
+              </Alert>
+            )}
             {error && <Alert severity="error">{error}</Alert>}
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, md: 6 }}>

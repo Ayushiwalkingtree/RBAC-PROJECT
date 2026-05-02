@@ -30,7 +30,19 @@ class PermissionService:
             invalid = [permission for permission in permissions if permission.upper() not in allowed[resource_key]]
             if invalid:
                 raise AppError(422, "INVALID_PERMISSION", f"Invalid permissions for {resource_key}: {invalid}")
+        old_permissions = dict(role.permissions.permissions_json or {})
         role.permissions.permissions_json = {key: [p.upper() for p in values] for key, values in permissions_json.items()}
-        await self.audit.write(org_id, "PERM_GRANTED", "ROLE_PERMISSION", f"Permissions updated for {role.role_code}", actor_user_id=actor_user_id, resource_id=str(role_id))
+        role.permissions.at_organization_id = org_id
+        role.permissions.updated_by = actor_user_id
+        await self.audit.write(
+            org_id,
+            "PERM_GRANTED",
+            "ROLE_PERMISSION",
+            f"Permissions updated for {role.role_code}",
+            actor_user_id=actor_user_id,
+            resource_id=str(role_id),
+            old_value_json=old_permissions,
+            new_value_json=role.permissions.permissions_json,
+        )
         await self.session.commit()
         return role.permissions

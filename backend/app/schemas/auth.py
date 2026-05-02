@@ -19,12 +19,14 @@ class LogoutRequest(BaseModel):
 
 class CurrentOrg(BaseModel):
     id: int
+    org_id: int | None = None
     org_code: str
     org_name: str
 
 
 class CurrentUser(BaseModel):
     id: int
+    user_id: int | None = None
     email: str
     full_name: str
     is_email_verified: bool

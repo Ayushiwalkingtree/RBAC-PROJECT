@@ -17,7 +17,6 @@ class SignupResponse(BaseModel):
     admin_user_id: int
     admin_role_code: str = "ORG_ADMIN"
     message: str
-    verification_token: str | None = None
 
 
 class VerifyEmailRequest(BaseModel):

@@ -9,6 +9,7 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserCreate, UserResponse, UserRolesUpdate, UserUpdate
 from app.services.audit_service import AuditService
 from app.services.user_service import UserService
+from app.utils.datetime import utcnow
 from app.utils.response import api_response
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -17,12 +18,15 @@ router = APIRouter(prefix="/users", tags=["users"])
 def serialize_user(user, role_ids: list[int]) -> dict:
     return UserResponse(
         id=user.id,
+        user_id=user.id,
         email=user.email,
         full_name=user.full_name,
         title=user.title,
         department=user.department,
+        phone=user.phone,
         is_active=user.is_active,
         is_email_verified=user.is_email_verified,
+        mfa_enabled=user.mfa_enabled,
         role_ids=role_ids,
     ).model_dump()
 
@@ -53,13 +57,13 @@ async def get_user(user_id: int, request: Request, session: DbSession, claims: C
 
 @router.put("/{user_id}", dependencies=[Depends(require_permission("USER_UPDATE_API", "EXECUTE"))])
 async def update_user(user_id: int, payload: UserUpdate, request: Request, session: DbSession, claims: CurrentClaims):
-    user = await UserService(session).update(get_current_org_id(claims), user_id, payload)
+    user = await UserService(session).update(get_current_org_id(claims), user_id, payload, get_current_user_id(claims))
     return api_response(request, serialize_user(user, await UserRepository(session).role_ids_for_user(user.id)))
 
 
 @router.delete("/{user_id}", dependencies=[Depends(require_permission("USER_DELETE_API", "EXECUTE"))])
 async def delete_user(user_id: int, request: Request, session: DbSession, claims: CurrentClaims):
-    await UserService(session).delete(get_current_org_id(claims), user_id)
+    await UserService(session).delete(get_current_org_id(claims), user_id, get_current_user_id(claims))
     return api_response(request, {"deleted": True})
 
 
@@ -79,7 +83,15 @@ async def replace_user_roles(user_id: int, payload: UserRolesUpdate, request: Re
     for existing in user.roles:
         existing.is_deleted = True
     for role_id in payload.role_ids:
-        session.add(UserRole(user_id=user_id, role_id=role_id, at_organization_id=org_id))
+        session.add(
+            UserRole(
+                user_id=user_id,
+                role_id=role_id,
+                at_organization_id=org_id,
+                assigned_at=utcnow(),
+                assigned_by=get_current_user_id(claims),
+            )
+        )
     await AuditService(session).write(org_id, "ROLE_ASSIGNED", "USER_ROLE", "User roles replaced", actor_user_id=get_current_user_id(claims), target_user_id=user_id)
     await session.commit()
     return api_response(request, {"role_ids": payload.role_ids})

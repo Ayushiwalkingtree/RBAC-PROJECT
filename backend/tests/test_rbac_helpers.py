@@ -38,6 +38,15 @@ def test_build_nav_tree_uses_view_permissions_and_parent_order() -> None:
     assert nav[0]["children"][0]["resource_key"] == "CHILD"
 
 
+def test_build_nav_tree_includes_parent_when_child_is_visible() -> None:
+    nav = build_nav_tree(
+        {"CHILD": ["VIEW"]},
+        [ResourceStub("ROOT", "Root", seq=20), ResourceStub("CHILD", "Child", parent="ROOT", seq=10)],
+    )
+    assert nav[0]["resource_key"] == "ROOT"
+    assert nav[0]["children"][0]["resource_key"] == "CHILD"
+
+
 def test_super_admin_reserved_for_platform() -> None:
     assert is_platform_super_admin("PLATFORM", ["SUPER_ADMIN"])
     assert not is_platform_super_admin("ACME_BANK", ["SUPER_ADMIN"])

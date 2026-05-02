@@ -9,13 +9,25 @@ class PermissionRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
+    @staticmethod
+    def permission_keys(permissions: list) -> set[str]:
+        keys: set[str] = set()
+        for permission in permissions:
+            if isinstance(permission, dict):
+                key = permission.get("key")
+            else:
+                key = permission
+            if key:
+                keys.add(str(key).upper())
+        return keys
+
     async def allowed_permission_map(self) -> dict[str, set[str]]:
         result = await self.session.execute(
             select(Resource.resource_key, ResourcePermission.permissions_json)
             .join(ResourcePermission, ResourcePermission.resource_id == Resource.id)
             .where(Resource.is_deleted.is_(False), ResourcePermission.is_deleted.is_(False))
         )
-        return {key: {item.upper() for item in values} for key, values in result.all()}
+        return {key: self.permission_keys(values) for key, values in result.all()}
 
     async def get_role_permission(self, role_id: int) -> RolePermission | None:
         result = await self.session.execute(

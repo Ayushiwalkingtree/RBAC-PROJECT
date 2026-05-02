@@ -15,6 +15,7 @@ class RoleUpdate(BaseModel):
 
 class RoleResponse(BaseModel):
     id: int
+    role_id: int | None = None
     role_code: str
     role_name: str
     description: str | None

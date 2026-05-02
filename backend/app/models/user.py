@@ -17,24 +17,35 @@ class User(Base, AuditColumns):
     full_name: Mapped[str] = mapped_column(String(255))
     title: Mapped[str | None] = mapped_column(String(120))
     department: Mapped[str | None] = mapped_column(String(120))
+    phone: Mapped[str | None] = mapped_column(String(40))
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    mfa_secret_enc: Mapped[str | None] = mapped_column(String(500))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     failed_attempts: Mapped[int] = mapped_column(default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     organization = relationship("Organization", back_populates="users")
-    roles = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
+    roles = relationship(
+        "UserRole",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="UserRole.user_id",
+    )
 
 
 class UserRole(Base, AuditColumns):
     __tablename__ = "at_user_role"
-    __table_args__ = (UniqueConstraint("user_id", "role_id", name="uq_user_role_pair"),)
+    __table_args__ = (UniqueConstraint("at_user_id", "at_role_id", name="uq_user_role_pair"),)
 
     id: Mapped[int_pk]
-    user_id: Mapped[int] = mapped_column(ForeignKey("at_user.id"), index=True)
-    role_id: Mapped[int] = mapped_column(ForeignKey("at_role.id"), index=True)
+    user_id: Mapped[int] = mapped_column("at_user_id", ForeignKey("at_user.id"), index=True)
+    role_id: Mapped[int] = mapped_column("at_role_id", ForeignKey("at_role.id"), index=True)
     at_organization_id: Mapped[int] = mapped_column(ForeignKey("at_organization.id"), index=True)
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    assigned_by: Mapped[int | None] = mapped_column(ForeignKey("at_user.id"))
 
-    user = relationship("User", back_populates="roles")
-    role = relationship("Role")
+    user = relationship("User", back_populates="roles", foreign_keys=[user_id])
+    role = relationship("Role", foreign_keys=[role_id])

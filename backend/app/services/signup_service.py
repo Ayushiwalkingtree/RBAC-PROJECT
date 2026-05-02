@@ -9,6 +9,8 @@ from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.signup import SignupRequest, SignupResponse
 from app.services.audit_service import AuditService
+from app.services.email_service import EmailService
+from app.utils.datetime import utcnow
 from app.utils.password import hash_password
 from app.utils.tokens import new_verification_token
 
@@ -23,6 +25,13 @@ CORE_ORG_ADMIN_PERMISSIONS: dict[str, list[str]] = {
     "AUDIT_LOG_API": ["READ"],
     "USER_MENU": ["VIEW", "CREATE", "READ", "UPDATE", "DELETE"],
     "ADMIN_MENU": ["VIEW"],
+    "ROLES_MENU": ["VIEW"],
+    "PERMISSION_MATRIX_MENU": ["VIEW"],
+    "SETTINGS_MENU": ["VIEW"],
+    "AUDIT_LOG_MENU": ["VIEW"],
+    "DASH_MENU": ["VIEW"],
+    "DASH_MAIN": ["VIEW"],
+    "REPORTS_MENU": ["VIEW"],
 }
 
 _verification_tokens: dict[str, tuple[int, int]] = {}
@@ -34,6 +43,7 @@ class SignupService:
         self.org_repo = OrganizationRepository(session)
         self.user_repo = UserRepository(session)
         self.audit = AuditService(session)
+        self.email_service = EmailService()
 
     async def signup(self, payload: SignupRequest) -> SignupResponse:
         org_code = payload.org_code.strip().upper()
@@ -46,6 +56,11 @@ class SignupService:
             timezone=payload.timezone,
             plan=payload.plan.upper(),
             support_email=str(payload.admin_email),
+            settings_json={
+                "timezone": payload.timezone,
+                "support_email": str(payload.admin_email),
+                "allowed_origins": [],
+            },
         )
         self.org_repo.add(org)
         await self.session.flush()
@@ -59,7 +74,13 @@ class SignupService:
         )
         self.session.add(role)
         await self.session.flush()
-        self.session.add(RolePermission(role_id=role.id, permissions_json=CORE_ORG_ADMIN_PERMISSIONS))
+        self.session.add(
+            RolePermission(
+                role_id=role.id,
+                at_organization_id=org.id,
+                permissions_json=CORE_ORG_ADMIN_PERMISSIONS,
+            )
+        )
 
         user = User(
             at_organization_id=org.id,
@@ -69,13 +90,29 @@ class SignupService:
             title="Organization Admin",
             department="Administration",
             is_email_verified=False,
+            password_changed_at=utcnow(),
         )
         self.user_repo.add(user)
         await self.session.flush()
-        self.user_repo.add_role(UserRole(user_id=user.id, role_id=role.id, at_organization_id=org.id))
+        self.user_repo.add_role(
+            UserRole(
+                user_id=user.id,
+                role_id=role.id,
+                at_organization_id=org.id,
+                assigned_at=utcnow(),
+                assigned_by=user.id,
+            )
+        )
 
         token = new_verification_token()
         _verification_tokens[token] = (org.id, user.id)
+        verification_url = f"{settings.frontend_verify_email_url}?token={token}"
+        await self.email_service.send_verification_email(
+            user.email,
+            user.full_name,
+            org.org_name,
+            verification_url,
+        )
         await self.audit.write(
             org.id,
             "ORG_CREATED",
@@ -84,14 +121,14 @@ class SignupService:
             actor_user_id=user.id,
             target_user_id=user.id,
             resource_id=str(org.id),
+            new_value_json={"org_code": org.org_code, "org_name": org.org_name, "plan": org.plan},
         )
         await self.session.commit()
         return SignupResponse(
             organization_id=org.id,
             org_code=org.org_code,
             admin_user_id=user.id,
-            message="Organization created. First administrator created as Organization Admin.",
-            verification_token=token if settings.env == "development" else None,
+            message="Organization created. Please verify your email using the link sent to your inbox.",
         )
 
     async def verify_email(self, token: str) -> None:
@@ -113,5 +150,7 @@ class SignupService:
             actor_user_id=user.id,
             target_user_id=user.id,
             resource_id=str(user.id),
+            old_value_json={"is_email_verified": False, "organization_is_verified": False},
+            new_value_json={"is_email_verified": True, "organization_is_verified": True},
         )
         await self.session.commit()

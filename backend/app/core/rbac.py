@@ -14,27 +14,42 @@ def merge_permissions(role_permission_records: list[dict[str, list[str]]]) -> di
 
 
 def build_nav_tree(merged_perms: dict[str, list[str]], resources: list[object]) -> list[dict]:
-    visible = []
     by_key = {getattr(resource, "resource_key"): resource for resource in resources}
-    for resource in resources:
+    nav_candidates = {
+        getattr(resource, "resource_key"): resource
+        for resource in resources
         if (
             not getattr(resource, "is_deleted", False)
             and getattr(resource, "is_active", True)
             and getattr(resource, "is_ui_visible", False)
             and getattr(resource, "resource_type") in NAV_TYPES
-            and "VIEW" in merged_perms.get(getattr(resource, "resource_key"), [])
-        ):
-            visible.append(
-                {
-                    "id": getattr(resource, "id"),
-                    "resource_key": getattr(resource, "resource_key"),
-                    "label": getattr(resource, "resource_name"),
-                    "path": getattr(resource, "ui_path", None) or "/dashboard",
-                    "parent_resource_key": getattr(resource, "parent_resource_key", None),
-                    "sequence_no": getattr(resource, "sequence_no", None) or 9999,
-                    "children": [],
-                }
-            )
+        )
+    }
+    visible_keys: set[str] = set()
+
+    for resource in resources:
+        resource_key = getattr(resource, "resource_key")
+        if resource_key not in nav_candidates or "VIEW" not in merged_perms.get(resource_key, []):
+            continue
+        visible_keys.add(resource_key)
+        parent_key = getattr(resource, "parent_resource_key", None)
+        while parent_key and parent_key in nav_candidates:
+            visible_keys.add(parent_key)
+            parent_key = getattr(nav_candidates[parent_key], "parent_resource_key", None)
+
+    visible = [
+        {
+            "id": getattr(resource, "id"),
+            "resource_key": getattr(resource, "resource_key"),
+            "label": getattr(resource, "resource_name"),
+            "path": getattr(resource, "ui_path", None) or "/dashboard",
+            "parent_resource_key": getattr(resource, "parent_resource_key", None),
+            "sequence_no": getattr(resource, "sequence_no", None) or 9999,
+            "children": [],
+        }
+        for resource_key, resource in nav_candidates.items()
+        if resource_key in visible_keys
+    ]
 
     items = {item["resource_key"]: item for item in visible}
     roots = []

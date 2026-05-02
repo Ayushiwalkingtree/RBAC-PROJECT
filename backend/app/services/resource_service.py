@@ -8,6 +8,18 @@ from app.schemas.resource import ResourceCreate, ResourceUpdate
 from app.services.audit_service import AuditService
 
 
+def permission_keys(permissions: list) -> list[str]:
+    keys: list[str] = []
+    for permission in permissions:
+        if isinstance(permission, dict):
+            key = permission.get("key")
+        else:
+            key = permission
+        if key:
+            keys.append(str(key).upper())
+    return keys
+
+
 class ResourceService:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -36,8 +48,23 @@ class ResourceService:
         )
         self.repo.add(resource)
         await self.session.flush()
-        self.repo.add_permissions(ResourcePermission(resource_id=resource.id, permissions_json=[p.upper() for p in payload.allowed_permissions]))
-        await self.audit.write(1, "RESOURCE_CREATED", "RESOURCE", f"{resource.resource_key} created", actor_user_id=actor_user_id, resource_id=str(resource.id), resource_key=resource.resource_key)
+        self.repo.add_permissions(
+            ResourcePermission(
+                resource_id=resource.id,
+                resource_key=resource.resource_key,
+                permissions_json=[p.upper() for p in payload.allowed_permissions],
+            )
+        )
+        await self.audit.write(
+            1,
+            "RESOURCE_CREATED",
+            "RESOURCE",
+            f"{resource.resource_key} created",
+            actor_user_id=actor_user_id,
+            resource_id=str(resource.id),
+            resource_key=resource.resource_key,
+            new_value_json={"resource_key": resource.resource_key, "permissions": [p.upper() for p in payload.allowed_permissions]},
+        )
         await self.session.commit()
         return resource
 
@@ -46,17 +73,41 @@ class ResourceService:
         if not resource:
             raise AppError(404, "RESOURCE_NOT_FOUND", "Resource was not found")
         perms = await self.repo.permission_by_resource_id(resource.id)
+        old_value = {
+            "resource_name": resource.resource_name,
+            "resource_type": resource.resource_type,
+            "resource_group": resource.resource_group,
+            "permissions": permission_keys(perms.permissions_json) if perms else [],
+            "is_active": resource.is_active,
+        }
         if payload.allowed_permissions is not None and perms:
-            removed = set(perms.permissions_json) - {p.upper() for p in payload.allowed_permissions}
+            removed = set(permission_keys(perms.permissions_json)) - {p.upper() for p in payload.allowed_permissions}
             for permission in removed:
                 if await self.permission_repo.is_permission_in_use(resource.resource_key, permission):
                     raise AppError(409, "PERMISSION_IN_USE", f"{permission} is already granted")
             perms.permissions_json = [p.upper() for p in payload.allowed_permissions]
+            perms.resource_key = resource.resource_key
         for field in ["resource_name", "resource_type", "resource_group", "description", "http_method", "api_path", "microservice", "is_ui_visible", "is_active", "ui_path", "icon", "sequence_no", "parent_resource_key"]:
             value = getattr(payload, field)
             if value is not None:
                 setattr(resource, field, value)
-        await self.audit.write(1, "RESOURCE_UPDATED", "RESOURCE", f"{resource.resource_key} updated", actor_user_id=actor_user_id, resource_id=str(resource.id), resource_key=resource.resource_key)
+        await self.audit.write(
+            1,
+            "RESOURCE_UPDATED",
+            "RESOURCE",
+            f"{resource.resource_key} updated",
+            actor_user_id=actor_user_id,
+            resource_id=str(resource.id),
+            resource_key=resource.resource_key,
+            old_value_json=old_value,
+            new_value_json={
+                "resource_name": resource.resource_name,
+                "resource_type": resource.resource_type,
+                "resource_group": resource.resource_group,
+                "permissions": permission_keys(perms.permissions_json) if perms else [],
+                "is_active": resource.is_active,
+            },
+        )
         await self.session.commit()
         return resource
 
@@ -68,5 +119,16 @@ class ResourceService:
         perms = await self.repo.permission_by_resource_id(resource_id)
         if perms:
             perms.is_deleted = True
-        await self.audit.write(1, "RESOURCE_UPDATED", "RESOURCE", f"{resource.resource_key} deleted", actor_user_id=actor_user_id, resource_id=str(resource.id), resource_key=resource.resource_key)
+            perms.is_active = False
+        await self.audit.write(
+            1,
+            "RESOURCE_UPDATED",
+            "RESOURCE",
+            f"{resource.resource_key} deleted",
+            actor_user_id=actor_user_id,
+            resource_id=str(resource.id),
+            resource_key=resource.resource_key,
+            old_value_json={"is_deleted": False, "is_active": True},
+            new_value_json={"is_deleted": True, "is_active": False},
+        )
         await self.session.commit()

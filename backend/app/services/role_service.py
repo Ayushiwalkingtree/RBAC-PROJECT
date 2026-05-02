@@ -19,25 +19,44 @@ class RoleService:
         role = Role(at_organization_id=org_id, role_code=payload.role_code.upper(), role_name=payload.role_name, description=payload.description, is_system=False)
         self.repo.add(role)
         await self.session.flush()
-        self.repo.add_permissions(RolePermission(role_id=role.id, permissions_json={}))
-        await self.audit.write(org_id, "ROLE_CREATED", "ROLE", f"{role.role_code} created", actor_user_id=actor_user_id, resource_id=str(role.id))
+        self.repo.add_permissions(RolePermission(role_id=role.id, at_organization_id=org_id, permissions_json={}))
+        await self.audit.write(
+            org_id,
+            "ROLE_CREATED",
+            "ROLE",
+            f"{role.role_code} created",
+            actor_user_id=actor_user_id,
+            resource_id=str(role.id),
+            new_value_json={"role_code": role.role_code, "role_name": role.role_name},
+        )
         await self.session.commit()
         return role
 
-    async def update(self, org_id: int, role_id: int, payload: RoleUpdate) -> Role:
+    async def update(self, org_id: int, role_id: int, payload: RoleUpdate, actor_user_id: int | None = None) -> Role:
         role = await self.repo.get_scoped(org_id, role_id)
         if not role:
             raise AppError(404, "ROLE_NOT_FOUND", "Role was not found")
+        old_value = {"role_code": role.role_code, "role_name": role.role_name, "description": role.description}
         if payload.role_code:
             role.role_code = payload.role_code.upper()
         if payload.role_name:
             role.role_name = payload.role_name
         if payload.description is not None:
             role.description = payload.description
+        await self.audit.write(
+            org_id,
+            "ROLE_UPDATED",
+            "ROLE",
+            f"{role.role_code} updated",
+            actor_user_id=actor_user_id,
+            resource_id=str(role.id),
+            old_value_json=old_value,
+            new_value_json={"role_code": role.role_code, "role_name": role.role_name, "description": role.description},
+        )
         await self.session.commit()
         return role
 
-    async def delete(self, org_id: int, role_id: int) -> None:
+    async def delete(self, org_id: int, role_id: int, actor_user_id: int | None = None) -> None:
         role = await self.repo.get_scoped(org_id, role_id)
         if not role:
             raise AppError(404, "ROLE_NOT_FOUND", "Role was not found")
@@ -46,6 +65,17 @@ class RoleService:
         if await self.repo.is_assigned_to_active_user(role_id):
             raise AppError(409, "ROLE_IN_USE", "Cannot delete a role assigned to active users")
         role.is_deleted = True
+        role.is_active = False
         if role.permissions:
             role.permissions.is_deleted = True
+        await self.audit.write(
+            org_id,
+            "ROLE_DELETED",
+            "ROLE",
+            f"{role.role_code} deleted",
+            actor_user_id=actor_user_id,
+            resource_id=str(role.id),
+            old_value_json={"is_deleted": False, "is_active": True},
+            new_value_json={"is_deleted": True, "is_active": False},
+        )
         await self.session.commit()

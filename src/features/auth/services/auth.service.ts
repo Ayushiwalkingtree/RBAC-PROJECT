@@ -30,7 +30,6 @@ type BackendSignupResponse = {
   admin_user_id: number;
   admin_role_code: string;
   message: string;
-  verification_token?: string | null;
 };
 
 type BackendAuthResponse = {
@@ -261,7 +260,6 @@ export const authService = {
           roleIds: [payload.admin_role_code],
           isEmailVerified: false,
         },
-        verificationToken: payload.verification_token ?? undefined,
         message: payload.message,
       };
     }

@@ -21,10 +21,16 @@ class AuditService:
         resource_id: str | None = None,
         resource_key: str | None = None,
         details_json: dict | None = None,
+        old_value_json: dict | None = None,
+        new_value_json: dict | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+        correlation_id: str | None = None,
     ) -> None:
         self.repo.add(
             AuditLog(
                 at_organization_id=org_id,
+                at_user_id=actor_user_id,
                 action=action,
                 actor_user_id=actor_user_id,
                 target_user_id=target_user_id,
@@ -33,5 +39,10 @@ class AuditService:
                 resource_key=resource_key,
                 message=message,
                 details_json=details_json,
+                old_value_json=old_value_json,
+                new_value_json=new_value_json,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                correlation_id=correlation_id,
             )
         )
