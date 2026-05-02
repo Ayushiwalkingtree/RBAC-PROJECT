@@ -57,13 +57,13 @@ export const SignupPage = () => {
       setError('');
       const result = await authService.signupTenant(values);
       window.localStorage.setItem(STORAGE_KEYS.lastOrgCode, result.org.code);
-      navigate(`${ROUTES.verifyEmail}?token=${encodeURIComponent(result.verificationToken)}`, {
+      navigate(result.verificationToken ? `${ROUTES.verifyEmail}?token=${encodeURIComponent(result.verificationToken)}` : ROUTES.verifyEmail, {
         replace: true,
         state: {
           token: result.verificationToken,
           email: result.user.email,
           orgCode: result.org.code,
-          successMessage: 'Organization created. First administrator created as Organization Admin.',
+          successMessage: result.message ?? 'Organization created. First administrator created as Organization Admin.',
         },
       });
     } catch (signupError) {

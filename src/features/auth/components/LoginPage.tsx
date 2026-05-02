@@ -70,7 +70,8 @@ export const LoginPage = () => {
   const onSubmit = handleSubmit(async (values) => {
     window.localStorage.setItem(STORAGE_KEYS.lastOrgCode, values.org_code);
     await login(values);
-    navigate(state?.from?.pathname ?? APP_CONFIG.defaultRoute, { replace: true });
+    const nextSession = useAuthStore.getState().session;
+    navigate(state?.from?.pathname ?? nextSession?.navigation[0]?.path ?? APP_CONFIG.defaultRoute, { replace: true });
   });
 
   if (isAuthenticated) {

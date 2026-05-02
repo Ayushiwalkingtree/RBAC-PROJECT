@@ -5,15 +5,67 @@ import { PERMISSION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.co
 import { mergeRolePermissions } from '@/shared/utils/rbac';
 import { navigationService } from '@/shared/services/navigation.service';
 import { createId } from '@/shared/utils/id';
+import { apiClient, unwrapApiData, useMocks, type ApiEnvelope } from '@/shared/api/apiClient';
 import type { AuthSession, LoginCredentials, Organization, SignupInput, SignupResult, UserRecord } from '@/shared/types/auth.types';
 import type { RefreshTokenRecord } from '@/shared/types/domain.types';
-import type { Role } from '@/shared/types/rbac.types';
+import type { ResourceRecord, Role } from '@/shared/types/rbac.types';
+import type { NavigationItem } from '@/shared/types/navigation.types';
+import type { ResourceType } from '@/shared/constants/permission.constants';
 import { createMockJwt } from './token.service';
 
 const normalize = (value: string): string => value.trim().toLowerCase();
 const normalizeCode = (value: string): string => value.trim().toUpperCase().replace(/\s+/g, '_');
 
 const passwordPolicyMessage = 'Password must be 8+ chars with uppercase, number, and special character.';
+
+type BackendOrganizationPublic = {
+  org_id: number;
+  org_name: string;
+  org_code: string;
+};
+
+type BackendSignupResponse = {
+  organization_id: number;
+  org_code: string;
+  admin_user_id: number;
+  admin_role_code: string;
+  message: string;
+  verification_token?: string | null;
+};
+
+type BackendAuthResponse = {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_at: string;
+  user: {
+    id: number;
+    email: string;
+    full_name: string;
+    is_email_verified: boolean;
+    is_active: boolean;
+  };
+  org: {
+    id: number;
+    org_code: string;
+    org_name: string;
+  };
+  roles: string[];
+  perms: Record<string, string[]>;
+  nav: BackendNavigationItem[];
+};
+
+type BackendNavigationItem = {
+  id: number | string;
+  resource_key: string;
+  label: string;
+  path: string;
+  parent_resource_key?: string | null;
+  sequence_no?: number | null;
+  icon?: string | null;
+  type?: string | null;
+  children?: BackendNavigationItem[];
+};
 
 export const validatePasswordPolicy = (password: string): void => {
   if (
@@ -93,10 +145,88 @@ const buildSession = (
   };
 };
 
+const fallbackIconForResourceKey = (resourceKey: string): string => {
+  const key = resourceKey.toUpperCase();
+  if (key.includes('USER')) return 'users';
+  if (key.includes('ROLE') || key.includes('ADMIN')) return 'roles';
+  if (key.includes('PERM')) return 'permissions';
+  if (key.includes('RESOURCE')) return 'resources';
+  if (key.includes('REPORT') || key.includes('AUDIT')) return 'reports';
+  if (key.includes('SETTING') || key.includes('ORG_SETTINGS')) return 'settings';
+  return 'dashboard';
+};
+
+const mapBackendNavigation = (items: BackendNavigationItem[]): NavigationItem[] =>
+  items.map((item) => ({
+    id: String(item.id),
+    label: item.label,
+    path: item.path || '/dashboard',
+    icon: item.icon ?? fallbackIconForResourceKey(item.resource_key),
+    type: (item.type ?? 'MENU') as ResourceType,
+    sequenceNo: item.sequence_no ?? 9999,
+    order: item.sequence_no ?? 9999,
+    resourceKey: item.resource_key,
+    parentResourceKey: item.parent_resource_key ?? undefined,
+    children: mapBackendNavigation(item.children ?? []),
+  }));
+
+const mapBackendAuthSession = (payload: BackendAuthResponse): AuthSession => {
+  const org: Organization = {
+    id: String(payload.org.id),
+    code: payload.org.org_code,
+    name: payload.org.org_name,
+    status: 'active',
+  };
+  const roles: Role[] = payload.roles.map((roleCode) => ({
+    id: `${payload.org.id}-${roleCode}`,
+    orgId: String(payload.org.id),
+    code: roleCode,
+    name: roleCode.replaceAll('_', ' '),
+    description: roleCode,
+    permissions: {},
+    isSystem: roleCode === 'ORG_ADMIN' || roleCode === 'SUPER_ADMIN',
+  }));
+
+  return {
+    accessToken: payload.access_token,
+    refreshToken: payload.refresh_token,
+    tokenType: payload.token_type,
+    expiresAt: payload.expires_at,
+    org,
+    user: {
+      id: String(payload.user.id),
+      orgId: String(payload.org.id),
+      orgCode: payload.org.org_code,
+      email: payload.user.email,
+      name: payload.user.full_name,
+      title: payload.roles.includes('SUPER_ADMIN') ? 'Platform Super Admin' : 'Organization User',
+      department: '',
+      status: payload.user.is_active ? 'active' : 'disabled',
+      isDeleted: false,
+      isEmailVerified: payload.user.is_email_verified,
+      roles: payload.roles,
+    },
+    roles,
+    permissions: payload.perms,
+    resources: [] as ResourceRecord[],
+    navigation: mapBackendNavigation(payload.nav),
+  };
+};
+
 export const authService = {
   getDemoCredentials: () => authData.demoCredentials,
 
   listOrganizations: async (): Promise<Organization[]> => {
+    if (!useMocks) {
+      const response = await apiClient.get<ApiEnvelope<BackendOrganizationPublic[]>>('/organizations/public');
+      return unwrapApiData(response.data).map((organization) => ({
+        id: String(organization.org_id),
+        code: organization.org_code,
+        name: organization.org_name,
+        status: 'active',
+      }));
+    }
+
     const database = await mockDbService.getDatabase();
     return database.organizations
       .filter((organization) => organization.status === 'active')
@@ -104,6 +234,38 @@ export const authService = {
   },
 
   signupTenant: async (input: SignupInput): Promise<SignupResult> => {
+    if (!useMocks) {
+      const response = await apiClient.post<ApiEnvelope<BackendSignupResponse>>('/signup', input);
+      const payload = unwrapApiData(response.data);
+      const org: Organization = {
+        id: String(payload.organization_id),
+        code: payload.org_code,
+        name: input.org_name,
+        status: 'active',
+        timezone: input.timezone,
+        plan: input.plan,
+      };
+
+      return {
+        org,
+        user: {
+          id: String(payload.admin_user_id),
+          orgId: String(payload.organization_id),
+          orgCode: payload.org_code,
+          email: input.admin_email,
+          password: '',
+          name: input.admin_name,
+          title: 'Organization Admin',
+          department: 'Administration',
+          status: 'active',
+          roleIds: [payload.admin_role_code],
+          isEmailVerified: false,
+        },
+        verificationToken: payload.verification_token ?? undefined,
+        message: payload.message,
+      };
+    }
+
     validatePasswordPolicy(input.password);
     const orgCode = normalizeCode(input.org_code);
     let result: SignupResult | null = null;
@@ -163,7 +325,12 @@ export const authService = {
         createdAt: now,
       };
 
-      result = { org, user: adminUser, verificationToken };
+      result = {
+        org,
+        user: adminUser,
+        verificationToken,
+        message: 'Organization created. First administrator created as Organization Admin.',
+      };
 
       return appendAuditLog(
         {
@@ -195,11 +362,20 @@ export const authService = {
   },
 
   getVerificationToken: async (token: string) => {
+    if (!useMocks) {
+      return token ? { token } : null;
+    }
+
     const database = await mockDbService.getDatabase();
     return database.verificationTokens.find((candidate) => candidate.token === token);
   },
 
   verifyEmail: async (token: string): Promise<void> => {
+    if (!useMocks) {
+      await apiClient.post('/verify-email', { token });
+      return;
+    }
+
     await mockDbService.updateDatabase((database) => {
       const verificationToken = database.verificationTokens.find((candidate) => candidate.token === token);
       if (!verificationToken) {
@@ -236,6 +412,11 @@ export const authService = {
   },
 
   login: async (credentials: LoginCredentials): Promise<AuthSession> => {
+    if (!useMocks) {
+      const response = await apiClient.post<ApiEnvelope<BackendAuthResponse>>('/auth/login', credentials);
+      return mapBackendAuthSession(unwrapApiData(response.data));
+    }
+
     let session: AuthSession | null = null;
     let loginError: string | null = null;
 
@@ -341,6 +522,17 @@ export const authService = {
     currentSession: AuthSession,
     rotateRefreshToken = false,
   ): Promise<AuthSession | null> => {
+    if (!useMocks) {
+      if (!rotateRefreshToken) {
+        return currentSession;
+      }
+
+      const response = await apiClient.post<ApiEnvelope<BackendAuthResponse>>('/auth/refresh', {
+        refresh_token: currentSession.refreshToken,
+      });
+      return mapBackendAuthSession(unwrapApiData(response.data));
+    }
+
     let refreshedSession: AuthSession | null = null;
 
     await mockDbService.updateDatabase((database) => {
@@ -405,6 +597,11 @@ export const authService = {
 
   logout: async (currentSession: AuthSession | null): Promise<void> => {
     if (!currentSession) return;
+
+    if (!useMocks) {
+      await apiClient.post('/auth/logout', { refresh_token: currentSession.refreshToken });
+      return;
+    }
 
     await mockDbService.updateDatabase((database) => {
       const refreshToken = database.refreshTokens.find((candidate) => candidate.token === currentSession.refreshToken);

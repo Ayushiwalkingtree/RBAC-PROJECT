@@ -43,7 +43,7 @@ export const VerifyEmailPage = () => {
       setDetails((current) => ({
         ...current,
         token,
-        email: record.email,
+        email: 'email' in record ? record.email : current?.email,
       }));
     });
   }, [token]);
@@ -70,9 +70,11 @@ export const VerifyEmailPage = () => {
           <Stack spacing={2.5}>
             <Box>
               <Typography variant="h4" fontWeight={900}>Verify email</Typography>
-              <Typography variant="body2" color="text.secondary">
-                This mock screen exposes the generated token so the full signup flow can be tested locally.
-              </Typography>
+              {token && (
+                <Typography variant="body2" color="text.secondary">
+                  Verification token received.
+                </Typography>
+              )}
             </Box>
             {details?.successMessage && <Alert severity="success">{details.successMessage}</Alert>}
             {details?.email && (
@@ -86,12 +88,6 @@ export const VerifyEmailPage = () => {
               label="Verification token"
               value={token}
               onChange={(event) => setToken(event.target.value)}
-              fullWidth
-            />
-            <TextField
-              label="Mock verification link"
-              value={`${window.location.origin}${ROUTES.verifyEmail}?token=${encodeURIComponent(token)}`}
-              InputProps={{ readOnly: true }}
               fullWidth
             />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }}>

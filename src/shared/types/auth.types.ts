@@ -70,5 +70,6 @@ export type SignupInput = {
 export type SignupResult = {
   org: Organization;
   user: UserRecord;
-  verificationToken: string;
+  verificationToken?: string;
+  message?: string;
 };
