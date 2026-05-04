@@ -1,4 +1,4 @@
-import { mockDbService } from '@/mock/services/mockDb.service';
+import { apiClient, unwrapApiData, type ApiEnvelope } from '@/shared/api/apiClient';
 
 export type DashboardMetrics = {
   users: number;
@@ -8,14 +8,17 @@ export type DashboardMetrics = {
 };
 
 export const dashboardService = {
-  getMetrics: async (orgId: string): Promise<DashboardMetrics> => {
-    const database = await mockDbService.getDatabase();
+  getMetrics: async (): Promise<DashboardMetrics> => {
+    const [usersResponse, rolesResponse] = await Promise.all([
+      apiClient.get<ApiEnvelope<unknown[]>>('/users'),
+      apiClient.get<ApiEnvelope<unknown[]>>('/roles'),
+    ]);
 
     return {
-      users: database.users.filter((user) => user.orgId === orgId && !user.isDeleted).length,
-      roles: database.roles.filter((role) => role.orgId === orgId).length,
-      tickets: database.tickets.filter((ticket) => ticket.orgId === orgId && !ticket.isDeleted).length,
-      reports: database.reports.filter((report) => report.orgId === orgId).length,
+      users: unwrapApiData(usersResponse.data).length,
+      roles: unwrapApiData(rolesResponse.data).length,
+      tickets: 0,
+      reports: 0,
     };
   },
 };

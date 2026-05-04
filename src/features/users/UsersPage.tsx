@@ -2,7 +2,6 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
-import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 import ToggleOnIcon from '@mui/icons-material/ToggleOn';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -244,17 +243,6 @@ export const UsersPage = () => {
     }
   };
 
-  const handleVerifyEmail = async (user: UserRecord) => {
-    try {
-      await userService.verifyUserEmail(user.id);
-      await loadData();
-      await refreshSession();
-      showToast('Email verified.');
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Unable to verify email.', 'error');
-    }
-  };
-
   const handleDelete = async () => {
     if (!deleteUser) {
       return;
@@ -373,17 +361,6 @@ export const UsersPage = () => {
                   )}
                   {canUpdateUser && (
                     <>
-                    {!user.isEmailVerified && (
-                      <Tooltip title="Mock verify email">
-                        <IconButton
-                          size="small"
-                          aria-label="Verify email"
-                          onClick={() => void handleVerifyEmail(user)}
-                        >
-                          <MarkEmailReadIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
                     <Tooltip title={isSelfUser(user) ? selfActionTooltip : user.status === 'active' ? 'Deactivate user' : 'Activate user'}>
                       <span>
                         <IconButton

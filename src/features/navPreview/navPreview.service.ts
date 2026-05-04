@@ -1,7 +1,4 @@
-import { mockDbService } from '@/mock/services/mockDb.service';
-import { apiClient, unwrapApiData, useMocks, type ApiEnvelope } from '@/shared/api/apiClient';
-import { mergeRolePermissions } from '@/shared/utils/rbac';
-import { navigationService } from '@/shared/services/navigation.service';
+import { apiClient, unwrapApiData, type ApiEnvelope } from '@/shared/api/apiClient';
 import type { UserRecord } from '@/shared/types/auth.types';
 import type { NavigationItem } from '@/shared/types/navigation.types';
 import type { EffectivePermissions, ResourceRecord } from '@/shared/types/rbac.types';
@@ -158,81 +155,33 @@ const mapEffectiveAccess = (payload: BackendEffectiveAccess, orgId: string, orgC
 
 export const navPreviewService = {
   listOrganizations: async (): Promise<PreviewOrganization[]> => {
-    if (!useMocks) {
-      const response = await apiClient.get<ApiEnvelope<BackendOrganization[]>>('/platform/organizations');
-      return unwrapApiData(response.data).map((org) => ({
-        orgId: String(org.org_id),
-        orgCode: org.org_code,
-        orgName: org.org_name,
-      }));
-    }
-
-    const database = await mockDbService.getDatabase();
-    return database.organizations
-      .filter((org) => org.code !== 'PLATFORM')
-      .map((org) => ({ orgId: org.id, orgCode: org.code, orgName: org.name }));
+    const response = await apiClient.get<ApiEnvelope<BackendOrganization[]>>('/platform/organizations');
+    return unwrapApiData(response.data).map((org) => ({
+      orgId: String(org.org_id),
+      orgCode: org.org_code,
+      orgName: org.org_name,
+    }));
   },
 
   listUsers: async (orgId: string, orgCode = ''): Promise<UserRecord[]> => {
-    if (!useMocks) {
-      const response = await apiClient.get<ApiEnvelope<BackendUser[]>>('/users');
-      return unwrapApiData(response.data).map((user) => mapBackendUser(user, orgId, orgCode));
-    }
-
-    const database = await mockDbService.getDatabase();
-    const roleById = new Map(database.roles.map((role) => [role.id, role.code]));
-    return database.users
-      .filter((user) => user.orgId === orgId && !user.isDeleted)
-      .map((user) => ({ ...user, roleCodes: user.roleIds.map((roleId) => roleById.get(roleId) ?? roleId) }));
+    const response = await apiClient.get<ApiEnvelope<BackendUser[]>>('/users');
+    return unwrapApiData(response.data).map((user) => mapBackendUser(user, orgId, orgCode));
   },
 
   listPlatformUsers: async (orgId: string, orgCode = ''): Promise<UserRecord[]> => {
-    if (!useMocks) {
-      const response = await apiClient.get<ApiEnvelope<BackendUser[]>>(`/platform/organizations/${orgId}/users`);
-      return unwrapApiData(response.data).map((user) => mapBackendUser(user, orgId, orgCode));
-    }
-
-    return navPreviewService.listUsers(orgId, orgCode);
+    const response = await apiClient.get<ApiEnvelope<BackendUser[]>>(`/platform/organizations/${orgId}/users`);
+    return unwrapApiData(response.data).map((user) => mapBackendUser(user, orgId, orgCode));
   },
 
   getPreview: async (userId: string, orgId: string, orgCode = ''): Promise<UserNavigationPreview> => {
-    if (!useMocks) {
-      const response = await apiClient.get<ApiEnvelope<BackendEffectiveAccess>>(`/users/${userId}/effective-access`);
-      return mapEffectiveAccess(unwrapApiData(response.data), orgId, orgCode);
-    }
-
-    const database = await mockDbService.getDatabase();
-    const user = database.users.find((candidate) => candidate.id === userId && !candidate.isDeleted);
-    if (!user) {
-      throw new Error('User was not found.');
-    }
-
-    const roles = database.roles.filter((role) => user.roleIds.includes(role.id));
-    const permissions = mergeRolePermissions(roles);
-    const apiResources = database.resources.filter(
-      (resource) => resource.resourceType === 'API' && permissions[resource.resourceKey]?.length,
-    );
-
-    return {
-      user,
-      roles: roles.map((role) => ({ id: role.id, code: role.code, name: role.name })),
-      permissions,
-      navigation: navigationService.buildNavigation(database.resources, permissions, {
-        orgCode: user.orgCode,
-        roles: roles.map((role) => role.name),
-      }),
-      apiResources,
-    };
+    const response = await apiClient.get<ApiEnvelope<BackendEffectiveAccess>>(`/users/${userId}/effective-access`);
+    return mapEffectiveAccess(unwrapApiData(response.data), orgId, orgCode);
   },
 
   getPlatformPreview: async (orgId: string, userId: string, orgCode = ''): Promise<UserNavigationPreview> => {
-    if (!useMocks) {
-      const response = await apiClient.get<ApiEnvelope<BackendEffectiveAccess>>(
-        `/platform/organizations/${orgId}/users/${userId}/effective-access`,
-      );
-      return mapEffectiveAccess(unwrapApiData(response.data), orgId, orgCode);
-    }
-
-    return navPreviewService.getPreview(userId, orgId, orgCode);
+    const response = await apiClient.get<ApiEnvelope<BackendEffectiveAccess>>(
+      `/platform/organizations/${orgId}/users/${userId}/effective-access`,
+    );
+    return mapEffectiveAccess(unwrapApiData(response.data), orgId, orgCode);
   },
 };

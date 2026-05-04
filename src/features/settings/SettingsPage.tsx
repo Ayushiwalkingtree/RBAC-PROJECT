@@ -1,4 +1,3 @@
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SaveIcon from '@mui/icons-material/Save';
 import {
   Alert,
@@ -17,11 +16,9 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { organizationService } from '@/features/settings/organization.service';
 import { AppButton } from '@/shared/components/AppButton';
-import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useToast } from '@/shared/components/useToast';
 import { PermissionGuard } from '@/shared/components/guards/PermissionGuard';
-import { useMocks } from '@/shared/api/apiClient';
 import { PERMISSION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
 import { THEME_OPTIONS } from '@/shared/theme/theme.constants';
 import { useThemeStore } from '@/shared/theme/theme.store';
@@ -32,7 +29,6 @@ import type { ThemeMode } from '@/shared/types/theme.types';
 export const SettingsPage = () => {
   const session = useAuthStore((state) => state.session);
   const refreshSession = useAuthStore((state) => state.refreshSession);
-  const logout = useAuthStore((state) => state.logout);
   const mode = useThemeStore((state) => state.mode);
   const setMode = useThemeStore((state) => state.setMode);
   const { showToast } = useToast();
@@ -40,7 +36,6 @@ export const SettingsPage = () => {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [sessions, setSessions] = useState<RefreshTokenRecord[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [resetOpen, setResetOpen] = useState(false);
 
   const loadSettings = async () => {
     if (!session) {
@@ -96,20 +91,6 @@ export const SettingsPage = () => {
     }
   };
 
-  const handleReset = async () => {
-    setIsSaving(true);
-    try {
-      await organizationService.resetMockDatabase();
-      showToast('Mock data reset. Please sign in again.', 'info');
-      await logout();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Unable to reset mock data.', 'error');
-    } finally {
-      setIsSaving(false);
-      setResetOpen(false);
-    }
-  };
-
   const handleThemeChange = (event: SelectChangeEvent) => {
     setMode(event.target.value as ThemeMode);
   };
@@ -133,13 +114,6 @@ export const SettingsPage = () => {
               Save settings
             </AppButton>
           </PermissionGuard>
-          {useMocks && (
-            <PermissionGuard resource={RESOURCE_KEYS.settingsManageApi} permission={PERMISSION_KEYS.update}>
-              <AppButton color="error" startIcon={<RestartAltIcon />} onClick={() => setResetOpen(true)}>
-                Reset Mock Data
-              </AppButton>
-            </PermissionGuard>
-          )}
         </Stack>
       </PageHeader>
 
@@ -197,7 +171,7 @@ export const SettingsPage = () => {
               </Grid>
               {settings.length > 0 && (
                 <Stack spacing={2}>
-                  <Typography variant="subtitle2" fontWeight={900}>Additional mock settings</Typography>
+                  <Typography variant="subtitle2" fontWeight={900}>Additional settings</Typography>
                   {settings.map((setting) => (
                     <TextField
                       key={setting.key}
@@ -223,7 +197,7 @@ export const SettingsPage = () => {
             ) : (
               sessions.map((sessionRecord) => (
                 <Paper key={sessionRecord.id} elevation={0} sx={{ border: 1, borderColor: 'divider', p: 1.5 }}>
-                  <Typography variant="body2" fontWeight={800}>{sessionRecord.userAgent ?? 'Mock browser session'}</Typography>
+                  <Typography variant="body2" fontWeight={800}>{sessionRecord.userAgent ?? 'Browser session'}</Typography>
                   <Typography variant="caption" color="text.secondary" display="block">
                     Created {new Date(sessionRecord.createdAt).toLocaleString()} · Expires {new Date(sessionRecord.expiresAt).toLocaleString()}
                   </Typography>
@@ -233,16 +207,6 @@ export const SettingsPage = () => {
           </Stack>
         </Paper>
       </Stack>
-
-      <ConfirmDialog
-        open={resetOpen}
-        title="Reset mock data"
-        description="This clears local mock database changes and restores the original JSON seed data. You will be signed out."
-        confirmLabel="Reset"
-        loading={isSaving}
-        onCancel={() => setResetOpen(false)}
-        onConfirm={handleReset}
-      />
     </>
   );
 };

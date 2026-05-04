@@ -1,9 +1,0 @@
-[
-  { "id": "nav-dashboard", "label": "Dashboard", "path": "/dashboard", "icon": "dashboard", "order": 10, "requiredPermission": { "resource": "dashboard", "action": "view" } },
-  { "id": "nav-users", "label": "Users", "path": "/users", "icon": "users", "order": 20, "requiredPermission": { "resource": "users", "action": "view" } },
-  { "id": "nav-roles", "label": "Roles", "path": "/roles", "icon": "roles", "order": 30, "requiredPermission": { "resource": "roles", "action": "view" } },
-  { "id": "nav-permissions", "label": "Permissions Matrix", "path": "/permissions", "icon": "permissions", "order": 40, "requiredPermission": { "resource": "permissions", "action": "view" } },
-  { "id": "nav-tickets", "label": "Tickets", "path": "/tickets", "icon": "tickets", "order": 50, "requiredPermission": { "resource": "tickets", "action": "view" } },
-  { "id": "nav-reports", "label": "Reports", "path": "/reports", "icon": "reports", "order": 60, "requiredPermission": { "resource": "reports", "action": "view" } },
-  { "id": "nav-settings", "label": "Settings", "path": "/settings", "icon": "settings", "order": 70, "requiredPermission": { "resource": "settings", "action": "view" } }
-]

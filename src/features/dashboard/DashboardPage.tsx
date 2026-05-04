@@ -24,7 +24,7 @@ export const DashboardPage = () => {
       return;
     }
 
-    void dashboardService.getMetrics(session.org.id).then(setMetrics);
+    void dashboardService.getMetrics().then(setMetrics);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.org.id]);
 
@@ -39,7 +39,7 @@ export const DashboardPage = () => {
     <>
       <PageHeader
         title="Dashboard"
-        subtitle="Live counts from the local mock database for the current tenant."
+        subtitle="Live tenant activity and access-control counts."
       />
       <Grid container spacing={2}>
         {cards.map((metric, index) => {

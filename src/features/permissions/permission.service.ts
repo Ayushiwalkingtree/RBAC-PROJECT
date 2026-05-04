@@ -1,7 +1,6 @@
-import { appendAuditLog, mockDbService } from '@/mock/services/mockDb.service';
 import { roleService } from '@/features/roles/role.service';
 import { ACTION_LABELS } from '@/shared/constants/permission.constants';
-import { apiClient, unwrapApiData, useMocks, type ApiEnvelope } from '@/shared/api/apiClient';
+import { apiClient, unwrapApiData, type ApiEnvelope } from '@/shared/api/apiClient';
 import type { ResourceRecord, Role } from '@/shared/types/rbac.types';
 
 export type PermissionsMatrix = {
@@ -71,35 +70,27 @@ export const permissionsFromMatrix = (resources: BackendMatrixResource[] = []): 
 
 export const permissionService = {
   getRolePermissionsMatrix: async (orgId: string): Promise<PermissionsMatrix> => {
-    if (!useMocks) {
-      const roles = await roleService.listRoles(orgId);
-      if (roles.length === 0) {
-        return { roles: [], resources: [] };
-      }
-      const rolesWithPermissions = await Promise.all(
-        roles.map(async (role) => {
-          const response = await apiClient.get<ApiEnvelope<BackendRolePermissions>>(`/roles/${role.id}/permissions`);
-          const payload = unwrapApiData(response.data);
-          const permissions = payload.resources?.length
-            ? permissionsFromMatrix(payload.resources)
-            : payload.permissions_json ?? {};
-          return {
-            role: { ...role, permissions },
-            resources: payload.resources ?? [],
-          };
-        }),
-      );
-
-      return {
-        roles: rolesWithPermissions.map((item) => item.role),
-        resources: rolesWithPermissions[0]?.resources.map(mapMatrixResource) ?? [],
-      };
+    const roles = await roleService.listRoles(orgId);
+    if (roles.length === 0) {
+      return { roles: [], resources: [] };
     }
+    const rolesWithPermissions = await Promise.all(
+      roles.map(async (role) => {
+        const response = await apiClient.get<ApiEnvelope<BackendRolePermissions>>(`/roles/${role.id}/permissions`);
+        const payload = unwrapApiData(response.data);
+        const permissions = payload.resources?.length
+          ? permissionsFromMatrix(payload.resources)
+          : payload.permissions_json ?? {};
+        return {
+          role: { ...role, permissions },
+          resources: payload.resources ?? [],
+        };
+      }),
+    );
 
-    const database = await mockDbService.getDatabase();
     return {
-      roles: database.roles.filter((role) => role.orgId === orgId),
-      resources: database.resources,
+      roles: rolesWithPermissions.map((item) => item.role),
+      resources: rolesWithPermissions[0]?.resources.map(mapMatrixResource) ?? [],
     };
   },
 
@@ -108,76 +99,18 @@ export const permissionService = {
     permissions: Role['permissions'],
     actor?: { userId?: string; email?: string },
   ): Promise<Role> => {
-    if (!useMocks) {
-      const response = await apiClient.put<ApiEnvelope<BackendRolePermissions>>(`/roles/${roleId}/permissions`, {
-        permissions_json: permissions,
-      });
-      const payload = unwrapApiData(response.data);
-      return {
-        id: String(payload.role_id),
-        orgId: '',
-        code: payload.role_code ?? '',
-        name: payload.role_code ?? '',
-        description: '',
-        permissions: payload.resources?.length ? permissionsFromMatrix(payload.resources) : payload.permissions_json ?? {},
-      };
-    }
-
-    let updatedRole: Role | null = null;
-    await mockDbService.updateDatabase((database) => {
-      const resourcesByKey = new Map(database.resources.map((resource) => [resource.resourceKey, resource]));
-
-      Object.entries(permissions).forEach(([resourceKey, grantedPermissions]) => {
-        const resource = resourcesByKey.get(resourceKey);
-        if (!resource) {
-          throw new Error(`Unknown resource ${resourceKey}.`);
-        }
-
-        const allowed = new Set(resource.allowedPermissions.map((permission) => permission.key));
-        const invalidPermission = grantedPermissions.find((permission) => !allowed.has(permission));
-        if (invalidPermission) {
-          throw new Error(`${invalidPermission} is not allowed for ${resourceKey}.`);
-        }
-      });
-
-      const role = database.roles.find((candidate) => candidate.id === roleId);
-      if (!role) {
-        throw new Error('Role was not found.');
-      }
-
-      const nextPermissions = database.resources.reduce<Role['permissions']>((grants, resource) => {
-        grants[resource.resourceKey] = permissions[resource.resourceKey] ?? [];
-        return grants;
-      }, {});
-
-      return appendAuditLog(
-        {
-        ...database,
-        roles: database.roles.map((role) => {
-          if (role.id !== roleId) {
-            return role;
-          }
-
-          updatedRole = { ...role, permissions: nextPermissions };
-          return updatedRole;
-        }),
-        },
-        {
-          orgId: role.orgId,
-          action: 'PERM_GRANTED',
-          actorUserId: actor?.userId,
-          actorEmail: actor?.email,
-          resourceType: 'ROLE_PERMISSION',
-          resourceId: roleId,
-          message: `Permissions updated for ${role.code}.`,
-        },
-      );
+    void actor;
+    const response = await apiClient.put<ApiEnvelope<BackendRolePermissions>>(`/roles/${roleId}/permissions`, {
+      permissions_json: permissions,
     });
-
-    if (!updatedRole) {
-      throw new Error('Role was not found.');
-    }
-
-    return updatedRole;
+    const payload = unwrapApiData(response.data);
+    return {
+      id: String(payload.role_id),
+      orgId: '',
+      code: payload.role_code ?? '',
+      name: payload.role_code ?? '',
+      description: '',
+      permissions: payload.resources?.length ? permissionsFromMatrix(payload.resources) : payload.permissions_json ?? {},
+    };
   },
 };

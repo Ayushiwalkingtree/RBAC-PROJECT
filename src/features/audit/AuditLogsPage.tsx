@@ -76,7 +76,7 @@ export const AuditLogsPage = () => {
       </Paper>
 
       {logs.length === 0 ? (
-        <EmptyState title="No audit events found" description="Matching activity will appear here as mock flows run." />
+        <EmptyState title="No audit events found" description="Matching backend activity will appear here." />
       ) : (
         <DataTable
           rows={logs}

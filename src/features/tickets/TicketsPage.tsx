@@ -198,7 +198,7 @@ export const TicketsPage = () => {
       <AppDialog
         open={createDialogOpen || editingTicket !== null || assigningTicket !== null}
         title={assigningTicket ? 'Assign ticket' : editingTicket ? 'Edit ticket' : 'Create ticket'}
-        helperText="Ticket changes are persisted to the local mock database."
+        helperText="Ticket changes require the Tickets backend API."
         onClose={closeDialog}
       >
         <Stack component="form" spacing={2.5} onSubmit={onSubmit}>
@@ -260,7 +260,7 @@ export const TicketsPage = () => {
       <ConfirmDialog
         open={Boolean(deletingTicket)}
         title="Delete ticket"
-        description={`Delete ${deletingTicket?.id ?? 'this ticket'} from the mock database?`}
+        description={`Delete ${deletingTicket?.id ?? 'this ticket'}?`}
         confirmLabel="Delete"
         loading={isSubmitting}
         onCancel={() => setDeletingTicket(null)}

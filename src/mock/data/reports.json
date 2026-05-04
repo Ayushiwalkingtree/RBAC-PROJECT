@@ -1,6 +1,0 @@
-[
-  { "id": "rpt-access-review", "orgId": "org-acme", "name": "Access Review", "category": "Governance", "updatedAt": "2026-04-22" },
-  { "id": "rpt-ticket-sla", "orgId": "org-acme", "name": "Ticket SLA", "category": "Operations", "updatedAt": "2026-04-26" },
-  { "id": "rpt-permission-drift", "orgId": "org-globex", "name": "Permission Drift", "category": "Security", "updatedAt": "2026-04-27" },
-  { "id": "rpt-user-inventory", "orgId": "org-globex", "name": "User Inventory", "category": "Compliance", "updatedAt": "2026-04-28" }
-]

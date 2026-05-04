@@ -1,5 +1,4 @@
-import { mockDbService } from '@/mock/services/mockDb.service';
-import { apiClient, unwrapApiData, useMocks, type ApiEnvelope } from '@/shared/api/apiClient';
+import { apiClient, unwrapApiData, type ApiEnvelope } from '@/shared/api/apiClient';
 import type { AuditLog } from '@/shared/types/domain.types';
 
 export type AuditLogFilters = {
@@ -57,40 +56,14 @@ const mapBackendAuditLog = (log: BackendAuditLog): AuditLog => ({
 
 export const auditService = {
   listAuditLogs: async (filters: AuditLogFilters): Promise<AuditLog[]> => {
-    if (!useMocks) {
-      const params = {
-        action: filters.action || undefined,
-        resource_type: filters.resourceType || undefined,
-        user_id: filters.userId || (/^\d+$/u.test(filters.user ?? '') ? filters.user : undefined),
-        date_from: filters.dateFrom || filters.date || undefined,
-        date_to: filters.dateTo || filters.date || undefined,
-      };
-      const response = await apiClient.get<ApiEnvelope<BackendAuditLog[]>>('/audit-logs', { params });
-      return unwrapApiData(response.data).map(mapBackendAuditLog);
-    }
-
-    const database = await mockDbService.getDatabase();
-    const usersById = new Map(database.users.map((user) => [user.id, user]));
-
-    return database.auditLogs
-      .filter((log) => filters.isPlatform || log.orgId === filters.orgId)
-      .filter((log) => !filters.action || log.action === filters.action)
-      .filter((log) => !filters.resourceType || log.resourceType === filters.resourceType)
-      .filter((log) => !filters.date || log.createdAt.slice(0, 10) === filters.date)
-      .filter((log) => {
-        if (!filters.user) return true;
-        const userText = [
-          log.actorEmail,
-          log.actorUserId,
-          log.targetUserId,
-          usersById.get(log.actorUserId ?? '')?.name,
-          usersById.get(log.targetUserId ?? '')?.name,
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        return userText.includes(filters.user.toLowerCase());
-      })
-      .sort((current, next) => next.createdAt.localeCompare(current.createdAt));
+    const params = {
+      action: filters.action || undefined,
+      resource_type: filters.resourceType || undefined,
+      user_id: filters.userId || (/^\d+$/u.test(filters.user ?? '') ? filters.user : undefined),
+      date_from: filters.dateFrom || filters.date || undefined,
+      date_to: filters.dateTo || filters.date || undefined,
+    };
+    const response = await apiClient.get<ApiEnvelope<BackendAuditLog[]>>('/audit-logs', { params });
+    return unwrapApiData(response.data).map(mapBackendAuditLog);
   },
 };

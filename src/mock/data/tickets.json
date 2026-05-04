@@ -1,6 +1,0 @@
-[
-  { "id": "TCK-1042", "orgId": "org-acme", "subject": "Invite flow review", "status": "Open", "priority": "High", "owner": "Mira Patel" },
-  { "id": "TCK-1043", "orgId": "org-acme", "subject": "Billing role approval", "status": "In Progress", "priority": "Medium", "owner": "Avery Stone" },
-  { "id": "TCK-2081", "orgId": "org-globex", "subject": "Quarterly access audit", "status": "Open", "priority": "High", "owner": "Jordan Lee" },
-  { "id": "TCK-2082", "orgId": "org-globex", "subject": "Report export request", "status": "Resolved", "priority": "Low", "owner": "Sam Rivera" }
-]

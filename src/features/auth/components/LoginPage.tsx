@@ -4,7 +4,6 @@ import {
   Autocomplete,
   Box,
   Button,
-  Chip,
   Collapse,
   Container,
   Divider,
@@ -40,19 +39,17 @@ export const LoginPage = () => {
   const error = useAuthStore((store) => store.error);
   const isLoading = useAuthStore((store) => store.isLoading);
   const isAuthenticated = useAuthStore((store) => store.isAuthenticated);
-  const demoCredentials = authService.getDemoCredentials();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [showAdvancedOrgCode, setShowAdvancedOrgCode] = useState(false);
   const lastOrgCode =
     typeof window === 'undefined' ? undefined : window.localStorage.getItem(STORAGE_KEYS.lastOrgCode) ?? undefined;
-  const initialCredential =
-    demoCredentials.find((credential) => credential.org_code === lastOrgCode) ?? demoCredentials[0];
 
-  const { control, handleSubmit, setValue } = useForm<LoginFormValues>({
+  const { control, handleSubmit } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      ...initialCredential,
-      org_code: lastOrgCode ?? initialCredential.org_code,
+      org_code: lastOrgCode ?? '',
+      email: '',
+      password: '',
     },
   });
 
@@ -95,24 +92,8 @@ export const LoginPage = () => {
               {APP_CONFIG.name}
             </Typography>
             <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 560 }}>
-              Multi-tenant access control with tenant-scoped identities, permission-first UI,
-              and mock API responses shaped like production auth payloads.
+              Multi-tenant access control with tenant-scoped identities and permission-first UI.
             </Typography>
-            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 3 }}>
-              {demoCredentials.map((credential) => (
-                <Chip
-                  key={`${credential.org_code}-${credential.email}-${credential.persona}`}
-                  label={`${credential.org_code} / ${credential.persona}`}
-                  onClick={() => {
-                    window.localStorage.setItem(STORAGE_KEYS.lastOrgCode, credential.org_code);
-                    setValue('org_code', credential.org_code);
-                    setValue('email', credential.email);
-                    setValue('password', credential.password);
-                  }}
-                  variant="outlined"
-                />
-              ))}
-            </Stack>
           </Box>
           <Paper
             component="form"

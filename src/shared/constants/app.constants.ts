@@ -7,9 +7,4 @@ export const APP_CONFIG = {
 
 export const AUTH_CONFIG = {
   tokenType: 'Bearer',
-  tokenIssuer: 'mock-rbac-api',
-  tokenTtlMinutes: 15,
-  refreshTokenTtlDays: 7,
-  lockoutMinutes: 30,
-  maxFailedAttempts: 5,
 } as const;

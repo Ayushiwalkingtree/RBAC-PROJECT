@@ -1,6 +1,0 @@
-[
-  { "orgId": "org-acme", "key": "Session policy", "value": "60 minutes" },
-  { "orgId": "org-acme", "key": "Default invitation role", "value": "Support Lead" },
-  { "orgId": "org-globex", "key": "Session policy", "value": "45 minutes" },
-  { "orgId": "org-globex", "key": "Default invitation role", "value": "Compliance Reader" }
-]

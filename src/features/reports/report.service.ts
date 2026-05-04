@@ -1,8 +1,4 @@
-import { mockDbService } from '@/mock/services/mockDb.service';
-import { PERMISSION_KEYS } from '@/shared/constants/permission.constants';
-import { canAccess } from '@/shared/utils/rbac';
-import { buildReportRows, toBusinessResourceName } from '@/shared/utils/rbacDisplay.adapter';
-import type { EffectivePermissions, ResourceRecord } from '@/shared/types/rbac.types';
+import type { EffectivePermissions } from '@/shared/types/rbac.types';
 
 const escapeCsv = (value: string): string => `"${value.replaceAll('"', '""')}"`;
 
@@ -17,17 +13,8 @@ export type AccessibleReport = {
 
 export const reportService = {
   listAccessibleReports: async (permissions: EffectivePermissions): Promise<AccessibleReport[]> => {
-    const database = await mockDbService.getDatabase();
-    return buildReportRows(database.resources)
-      .filter((resource) => canAccess(permissions, resource.resourceKey, PERMISSION_KEYS.view))
-      .map((resource: ResourceRecord) => ({
-        id: resource.id,
-        resourceKey: resource.resourceKey,
-        name: toBusinessResourceName(resource),
-        category: resource.displayCategory ?? resource.resourceGroup,
-        description: resource.description,
-        canDownload: canAccess(permissions, resource.resourceKey, PERMISSION_KEYS.download),
-      }));
+    void permissions;
+    return [];
   },
 
   exportReportCsv: async (report: AccessibleReport): Promise<{ fileName: string; csv: string }> => {
