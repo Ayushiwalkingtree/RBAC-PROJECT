@@ -1,4 +1,5 @@
 import { mockDbService } from '@/mock/services/mockDb.service';
+import { apiClient, unwrapApiData, useMocks, type ApiEnvelope } from '@/shared/api/apiClient';
 import { RESOURCE_TYPES } from '@/shared/constants/permission.constants';
 import type { NavigationItem } from '@/shared/types/navigation.types';
 import type { ResourceRecord } from '@/shared/types/rbac.types';
@@ -17,6 +18,44 @@ const sortBySequence = (current: ResourceRecord, next: ResourceRecord): number =
 const flattenNavigation = (items: NavigationItem[]): NavigationItem[] =>
   items.flatMap((item) => [item, ...flattenNavigation(item.children ?? [])]);
 
+type BackendNavigationItem = {
+  id: number | string;
+  resource_key: string;
+  label: string;
+  path: string;
+  parent_resource_key?: string | null;
+  sequence_no?: number | null;
+  icon?: string | null;
+  type?: string | null;
+  children?: BackendNavigationItem[];
+};
+
+const fallbackIconForResourceKey = (resourceKey: string): string => {
+  const key = resourceKey.toUpperCase();
+  if (key.includes('USER')) return 'users';
+  if (key.includes('ROLE') || key.includes('ADMIN')) return 'roles';
+  if (key.includes('PERM')) return 'permissions';
+  if (key.includes('RESOURCE')) return 'resources';
+  if (key.includes('REPORT') || key.includes('AUDIT')) return 'reports';
+  if (key.includes('SETTING')) return 'settings';
+  if (key.includes('TICKET')) return 'tickets';
+  return 'dashboard';
+};
+
+const mapBackendNavigation = (items: BackendNavigationItem[]): NavigationItem[] =>
+  items.map((item) => ({
+    id: String(item.id),
+    label: item.label,
+    path: item.path || '/dashboard',
+    icon: item.icon ?? fallbackIconForResourceKey(item.resource_key),
+    type: (item.type ?? 'MENU') as NavigationItem['type'],
+    sequenceNo: item.sequence_no ?? 9999,
+    order: item.sequence_no ?? 9999,
+    resourceKey: item.resource_key,
+    parentResourceKey: item.parent_resource_key ?? undefined,
+    children: mapBackendNavigation(item.children ?? []),
+  }));
+
 const collectSequenceUpdates = (
   items: NavigationItem[],
   parentResourceKey?: string,
@@ -30,7 +69,63 @@ const collectSequenceUpdates = (
     ...collectSequenceUpdates(item.children ?? [], item.resourceKey),
   ]);
 
+const toNavigationOrderPayload = (navTree: NavigationItem[]) => {
+  const itemById = new Map(flattenNavigation(navTree).map((item) => [item.id, item]));
+  return {
+    items: collectSequenceUpdates(navTree)
+      .map((update) => ({
+        resource_key: itemById.get(update.id)?.resourceKey,
+        parent_resource_key: update.parentResourceKey ?? null,
+        sequence_no: update.sequenceNo,
+      }))
+      .filter((item) => item.resource_key),
+  };
+};
+
 export const navigationOrderService = {
+  getNavigationTree: async (): Promise<NavigationItem[]> => {
+    if (!useMocks) {
+      const response = await apiClient.get<ApiEnvelope<BackendNavigationItem[]>>('/navigation/order');
+      return mapBackendNavigation(unwrapApiData(response.data));
+    }
+
+    const resources = await navigationOrderService.getNavigationResources();
+    const byKey = new Map(resources.map((resource) => [resource.resourceKey, resource]));
+    const items: NavigationItem[] = resources.map((resource): NavigationItem => ({
+      id: resource.id,
+      label: resource.displayName ?? resource.resourceName,
+      path: resource.uiPath ?? '/dashboard',
+      icon: resource.icon ?? 'dashboard',
+      type: resource.resourceType,
+      sequenceNo: resource.sequenceNo ?? 9999,
+      order: resource.sequenceNo ?? 9999,
+      resourceKey: resource.resourceKey,
+      parentResourceKey: resource.parentResourceKey,
+      children: [],
+    }));
+    const itemByKey = new Map(items.map((item) => [item.resourceKey, item]));
+    const roots: NavigationItem[] = [];
+    items.forEach((item) => {
+      if (item.parentResourceKey && byKey.has(item.parentResourceKey) && itemByKey.has(item.parentResourceKey)) {
+        itemByKey.get(item.parentResourceKey)?.children?.push(item);
+        return;
+      }
+      roots.push(item);
+    });
+    const sortTree = (tree: NavigationItem[]): NavigationItem[] =>
+      tree.sort((a, b) => a.sequenceNo - b.sequenceNo).map((item) => ({ ...item, children: sortTree(item.children ?? []) }));
+    return sortTree(roots);
+  },
+
+  getUserNavigationTree: async (userId: string): Promise<NavigationItem[]> => {
+    if (!useMocks) {
+      const response = await apiClient.get<ApiEnvelope<BackendNavigationItem[]>>(`/users/${userId}/navigation/order`);
+      return mapBackendNavigation(unwrapApiData(response.data));
+    }
+
+    return navigationOrderService.getNavigationTree();
+  },
+
   getNavigationResources: async (): Promise<ResourceRecord[]> => {
     const database = await mockDbService.getDatabase();
     return navigationOrderService.normalizeSequenceNumbers(
@@ -86,6 +181,10 @@ export const navigationOrderService = {
 
   persistNavigationOrder: async (navTree: NavigationItem[]): Promise<ResourceRecord[]> => {
     const updates = collectSequenceUpdates(navTree);
+    if (!useMocks) {
+      await apiClient.put('/navigation/order', toNavigationOrderPayload(navTree));
+      return [];
+    }
     const updateById = new Map(updates.map((update) => [update.id, update]));
     const database = await mockDbService.updateDatabase((currentDatabase) => ({
       ...currentDatabase,
@@ -104,6 +203,16 @@ export const navigationOrderService = {
     }));
 
     return database.resources;
+  },
+
+  persistUserNavigationOrder: async (userId: string, navTree: NavigationItem[]): Promise<ResourceRecord[]> => {
+    if (!useMocks) {
+      await apiClient.put(`/users/${userId}/navigation/order`, toNavigationOrderPayload(navTree));
+      return [];
+    }
+
+    window.localStorage.setItem(`mock_user_nav_order_${userId}`, JSON.stringify(toNavigationOrderPayload(navTree)));
+    return [];
   },
 
   normalizeSequenceNumbers: (resources: ResourceRecord[]): ResourceRecord[] => {

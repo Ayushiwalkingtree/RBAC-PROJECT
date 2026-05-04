@@ -13,7 +13,8 @@ def merge_permissions(role_permission_records: list[dict[str, list[str]]]) -> di
     return {resource_key: sorted(values) for resource_key, values in merged.items()}
 
 
-def build_nav_tree(merged_perms: dict[str, list[str]], resources: list[object]) -> list[dict]:
+def build_nav_tree(merged_perms: dict[str, list[str]], resources: list[object], nav_overrides: dict[str, dict] | None = None) -> list[dict]:
+    nav_overrides = nav_overrides or {}
     by_key = {getattr(resource, "resource_key"): resource for resource in resources}
     nav_candidates = {
         getattr(resource, "resource_key"): resource
@@ -27,15 +28,23 @@ def build_nav_tree(merged_perms: dict[str, list[str]], resources: list[object]) 
     }
     visible_keys: set[str] = set()
 
+    def effective_parent_key(resource_key: str) -> str | None:
+        resource = nav_candidates.get(resource_key)
+        if not resource:
+            return None
+        return nav_overrides.get(resource_key, {}).get("parent_resource_key", getattr(resource, "parent_resource_key", None))
+
     for resource in resources:
         resource_key = getattr(resource, "resource_key")
         if resource_key not in nav_candidates or "VIEW" not in merged_perms.get(resource_key, []):
             continue
         visible_keys.add(resource_key)
-        parent_key = getattr(resource, "parent_resource_key", None)
-        while parent_key and parent_key in nav_candidates:
+        parent_key = effective_parent_key(resource_key)
+        seen_parents: set[str] = set()
+        while parent_key and parent_key in nav_candidates and parent_key not in seen_parents:
+            seen_parents.add(parent_key)
             visible_keys.add(parent_key)
-            parent_key = getattr(nav_candidates[parent_key], "parent_resource_key", None)
+            parent_key = effective_parent_key(parent_key)
 
     visible = [
         {
@@ -43,8 +52,8 @@ def build_nav_tree(merged_perms: dict[str, list[str]], resources: list[object]) 
             "resource_key": getattr(resource, "resource_key"),
             "label": getattr(resource, "resource_name"),
             "path": getattr(resource, "ui_path", None) or "/dashboard",
-            "parent_resource_key": getattr(resource, "parent_resource_key", None),
-            "sequence_no": getattr(resource, "sequence_no", None) or 9999,
+            "parent_resource_key": effective_parent_key(resource_key),
+            "sequence_no": nav_overrides.get(resource_key, {}).get("sequence_no", getattr(resource, "sequence_no", None) or 9999),
             "children": [],
         }
         for resource_key, resource in nav_candidates.items()

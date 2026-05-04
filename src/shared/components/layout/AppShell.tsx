@@ -34,6 +34,7 @@ import { useEffect, useMemo, useState, type PropsWithChildren, type ReactNode } 
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { APP_CONFIG } from '@/shared/constants/app.constants';
 import { PERMISSION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
+import { ROUTES } from '@/shared/constants/route.constants';
 import { STORAGE_KEYS } from '@/shared/constants/storage.constants';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { AppButton } from '@/shared/components/AppButton';
@@ -220,6 +221,7 @@ export const AppShell = ({ children }: PropsWithChildren) => {
   const canEditNavigation =
     Boolean(session) &&
     (can(RESOURCE_KEYS.resourceManageApi, PERMISSION_KEYS.update) ||
+      can(RESOURCE_KEYS.navOrderMenu, PERMISSION_KEYS.view) ||
       (session?.org.code === 'PLATFORM' &&
         session.user.roles.some((role) => role.toUpperCase().includes('SUPER ADMIN'))));
 
@@ -248,8 +250,7 @@ export const AppShell = ({ children }: PropsWithChildren) => {
   };
 
   const handleStartEditMode = () => {
-    setDraftNavigation(cloneNavigation(session?.navigation ?? []));
-    setIsNavEditMode(true);
+    navigate(ROUTES.navigationOrder);
   };
 
   const handleCancelEditMode = () => {

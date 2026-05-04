@@ -1,6 +1,7 @@
 from app.models.audit_log import AuditLog
 from app.models.base import Base
 from app.models.organization import Organization
+from app.models.navigation import OrganizationNavOrder, UserNavOrder
 from app.models.refresh_token import RefreshToken
 from app.models.resource import Resource, ResourcePermission
 from app.models.role import Role, RolePermission
@@ -10,6 +11,8 @@ __all__ = [
     "AuditLog",
     "Base",
     "Organization",
+    "OrganizationNavOrder",
+    "UserNavOrder",
     "RefreshToken",
     "Resource",
     "ResourcePermission",

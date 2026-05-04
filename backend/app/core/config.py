@@ -20,6 +20,7 @@ class Settings(BaseModel):
     redis_url: str | None = None
     email_provider: str = Field(default="console")
     frontend_verify_email_url: str = Field(default="http://localhost:5173/verify-email")
+    expose_dev_verification_link: bool = Field(default=True)
     smtp_host: str | None = None
     smtp_port: int = Field(default=587)
     smtp_username: str | None = None
@@ -55,6 +56,11 @@ def get_settings() -> Settings:
             "FRONTEND_VERIFY_EMAIL_URL",
             "http://localhost:5173/verify-email",
         ),
+        expose_dev_verification_link=os.getenv(
+            "EXPOSE_DEV_VERIFICATION_LINK",
+            "true" if os.getenv("ENV", "development") == "development" else "false",
+        ).lower()
+        in {"1", "true", "yes", "on"},
         smtp_host=os.getenv("SMTP_HOST") or None,
         smtp_port=int(os.getenv("SMTP_PORT", "587")),
         smtp_username=os.getenv("SMTP_USERNAME") or None,

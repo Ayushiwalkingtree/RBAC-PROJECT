@@ -38,8 +38,9 @@ class UserResponse(BaseModel):
     is_email_verified: bool
     mfa_enabled: bool = False
     role_ids: list[int] = []
+    role_codes: list[str] = []
 
 
 class UserCreateResponse(BaseModel):
     user: UserResponse
-    verification_token: str | None = None
+    dev_verification_url: str | None = None

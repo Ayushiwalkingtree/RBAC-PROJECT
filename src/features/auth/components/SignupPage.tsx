@@ -47,6 +47,7 @@ export const SignupPage = () => {
   const isAuthenticated = useAuthStore((store) => store.isAuthenticated);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [devVerificationUrl, setDevVerificationUrl] = useState('');
   const { control, handleSubmit, setValue, formState } = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues,
@@ -56,9 +57,11 @@ export const SignupPage = () => {
     try {
       setError('');
       setSuccessMessage('');
+      setDevVerificationUrl('');
       const result = await authService.signupTenant(values);
       window.localStorage.setItem(STORAGE_KEYS.lastOrgCode, result.org.code);
       setSuccessMessage(result.message ?? 'Organization created. Please check your email to verify your account.');
+      setDevVerificationUrl(result.devVerificationUrl ?? '');
     } catch (signupError) {
       setError(signupError instanceof Error ? signupError.message : 'Unable to create organization.');
     }
@@ -84,12 +87,19 @@ export const SignupPage = () => {
               <Alert
                 severity="success"
                 action={(
-                  <Button component={RouterLink} to={ROUTES.login} color="inherit" size="small">
-                    Back to sign in
-                  </Button>
+                  <Stack direction="row" spacing={1}>
+                    {devVerificationUrl && (
+                      <Button href={devVerificationUrl} color="inherit" size="small">
+                        Open verification link
+                      </Button>
+                    )}
+                    <Button component={RouterLink} to={ROUTES.login} color="inherit" size="small">
+                      Back to sign in
+                    </Button>
+                  </Stack>
                 )}
               >
-                Organization created. Please check your email to verify your account.
+                {successMessage}
               </Alert>
             )}
             {error && <Alert severity="error">{error}</Alert>}

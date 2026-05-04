@@ -11,9 +11,11 @@ import { ResourceRegistryPage } from '@/features/resources/ResourceRegistryPage'
 import { DynamicResourcePage } from '@/features/resources/DynamicResourcePage';
 import { RolesPage } from '@/features/roles/RolesPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
+import { TenantAdminAccessPage } from '@/features/tenantAdminAccess/TenantAdminAccessPage';
 import { TicketsPage } from '@/features/tickets/TicketsPage';
 import { UsersPage } from '@/features/users/UsersPage';
 import { NavPreviewPage } from '@/features/navPreview/NavPreviewPage';
+import { NavigationOrderPage } from '@/features/navigationOrder/NavigationOrderPage';
 import { AppShell } from '@/shared/components/layout/AppShell';
 import { AuthGuard } from '@/shared/components/guards/AuthGuard';
 import { PermissionGuard } from '@/shared/components/guards/PermissionGuard';
@@ -78,7 +80,12 @@ export const AppRouter = () => (
             path={ROUTES.resourceRegistry}
             element={protectedElement(ROUTES.resourceRegistry, <ResourceRegistryPage />)}
           />
+          <Route
+            path={ROUTES.tenantAdminAccess}
+            element={protectedElement(ROUTES.tenantAdminAccess, <TenantAdminAccessPage />)}
+          />
           <Route path={ROUTES.navPreview} element={protectedElement(ROUTES.navPreview, <NavPreviewPage />)} />
+          <Route path={ROUTES.navigationOrder} element={protectedElement(ROUTES.navigationOrder, <NavigationOrderPage />)} />
           <Route path="*" element={<DynamicResourcePage />} />
         </Route>
       </Route>

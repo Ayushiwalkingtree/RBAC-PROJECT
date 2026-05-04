@@ -7,8 +7,10 @@ import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 import ToggleOnIcon from '@mui/icons-material/ToggleOn';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
+  Box,
   Chip,
   DialogActions,
+  Alert,
   FormControlLabel,
   IconButton,
   Stack,
@@ -17,7 +19,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { roleService } from '@/features/roles/role.service';
 import { useAuthStore } from '@/features/auth/store/auth.store';
@@ -58,6 +60,7 @@ export const UsersPage = () => {
   const [roleAssignmentDraft, setRoleAssignmentDraft] = useState<string[]>([]);
   const [deleteUser, setDeleteUser] = useState<UserRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [devVerificationUrl, setDevVerificationUrl] = useState('');
 
   const { control, handleSubmit, reset } = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
@@ -71,8 +74,18 @@ export const UsersPage = () => {
   const canCreateUser = canAny(RESOURCE_PERMISSION_RULES.users.create);
   const canUpdateUser = canAny(RESOURCE_PERMISSION_RULES.users.update);
   const canDeleteUser = canAny(RESOURCE_PERMISSION_RULES.users.delete);
+  const selfActionTooltip = 'You cannot modify your own access level or deactivate your account.';
 
-  const loadData = async () => {
+  const isSelfUser = useCallback(
+    (user: UserRecord) =>
+      Boolean(
+        session?.user.id &&
+          (user.id === session.user.id || user.email.toLowerCase() === session.user.email.toLowerCase()),
+      ),
+    [session?.user.email, session?.user.id],
+  );
+
+  const loadData = useCallback(async () => {
     if (!session) {
       return;
     }
@@ -83,21 +96,42 @@ export const UsersPage = () => {
     ]);
     setUsers(nextUsers);
     setRoles(nextRoles);
-  };
+  }, [session]);
 
   useEffect(() => {
     void loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.org.id]);
+  }, [loadData]);
+
+  useEffect(() => {
+    if (!session) return undefined;
+
+    const handleVerifiedEvent = (event: StorageEvent) => {
+      if (event.key !== 'email_verified_event') return;
+      void loadData();
+      showToast('User email verified successfully.');
+    };
+    const handleFocus = () => {
+      void loadData();
+    };
+
+    window.addEventListener('storage', handleVerifiedEvent);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('storage', handleVerifiedEvent);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [loadData, session, showToast]);
 
   const openCreateDialog = () => {
     setEditingUser(null);
     setCreateDialogOpen(true);
+    setDevVerificationUrl('');
     reset(emptyUserValues);
   };
 
   const openEditDialog = (user: UserRecord) => {
     setEditingUser(user);
+    setDevVerificationUrl('');
     reset({
       full_name: user.name,
       email: user.email,
@@ -111,11 +145,12 @@ export const UsersPage = () => {
   const closeFormDialog = () => {
     setEditingUser(null);
     setCreateDialogOpen(false);
+    setDevVerificationUrl('');
     reset(emptyUserValues);
   };
 
   const onSubmit = handleSubmit(async (values) => {
-    if (!session) {
+    if (!session || isSubmitting || (!editingUser && devVerificationUrl)) {
       return;
     }
 
@@ -128,7 +163,7 @@ export const UsersPage = () => {
         if (!values.password) {
           throw new Error('Password is required for new users.');
         }
-        await userService.createUser({
+        const result = await userService.createUser({
           ...values,
           orgId: session.org.id,
           orgCode: session.org.code,
@@ -136,20 +171,37 @@ export const UsersPage = () => {
           actorUserId: session.user.id,
           actorEmail: session.user.email,
         });
+        setDevVerificationUrl(result.devVerificationUrl ?? '');
         showToast('User created.');
+        if (result.devVerificationUrl) {
+          reset(values);
+          await loadData();
+          await refreshSession();
+          return;
+        }
       }
 
       await loadData();
       await refreshSession();
       closeFormDialog();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'User action failed.', 'error');
+      const message = error instanceof Error ? error.message : 'User action failed.';
+      showToast(
+        message.includes('Email already exists') || message.includes('EMAIL_EXISTS')
+          ? 'This email already exists in the selected organization.'
+          : message,
+        'error',
+      );
     } finally {
       setIsSubmitting(false);
     }
   });
 
   const openAssignRolesDialog = (user: UserRecord) => {
+    if (isSelfUser(user)) {
+      showToast(selfActionTooltip, 'info');
+      return;
+    }
     setRoleAssignmentUser(user);
     setRoleAssignmentDraft(user.roleIds);
   };
@@ -177,6 +229,11 @@ export const UsersPage = () => {
   };
 
   const handleToggleActive = async (user: UserRecord) => {
+    if (isSelfUser(user)) {
+      showToast(selfActionTooltip, 'info');
+      return;
+    }
+
     try {
       await userService.setUserActive(user.id, user.status !== 'active');
       await loadData();
@@ -200,6 +257,11 @@ export const UsersPage = () => {
 
   const handleDelete = async () => {
     if (!deleteUser) {
+      return;
+    }
+    if (isSelfUser(deleteUser)) {
+      showToast(selfActionTooltip, 'info');
+      setDeleteUser(null);
       return;
     }
 
@@ -235,8 +297,25 @@ export const UsersPage = () => {
         <DataTable
           rows={users}
           getRowId={(user) => user.id}
+          getRowSx={(user) =>
+            isSelfUser(user)
+              ? {
+                  bgcolor: 'action.hover',
+                  '&:hover': { bgcolor: 'action.selected' },
+                }
+              : undefined
+          }
           columns={[
-            { id: 'name', label: 'Name', render: (user) => user.name },
+            {
+              id: 'name',
+              label: 'Name',
+              render: (user) => (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Box component="span">{user.name}</Box>
+                  {isSelfUser(user) && <Chip label="You" size="small" color="primary" variant="outlined" />}
+                </Stack>
+              ),
+            },
             { id: 'email', label: 'Email', render: (user) => user.email },
             { id: 'department', label: 'Department', render: (user) => user.department },
             {
@@ -278,14 +357,17 @@ export const UsersPage = () => {
                   )}
                   {canUpdateUser && (
                     <>
-                    <Tooltip title="Assign roles">
-                      <IconButton
-                        size="small"
-                        aria-label="Assign roles"
-                        onClick={() => openAssignRolesDialog(user)}
-                      >
-                        <GroupAddIcon fontSize="small" />
-                      </IconButton>
+                    <Tooltip title={isSelfUser(user) ? selfActionTooltip : 'Assign roles'}>
+                      <span>
+                        <IconButton
+                          size="small"
+                          aria-label="Assign roles"
+                          disabled={isSelfUser(user)}
+                          onClick={() => openAssignRolesDialog(user)}
+                        >
+                          <GroupAddIcon fontSize="small" />
+                        </IconButton>
+                      </span>
                     </Tooltip>
                     </>
                   )}
@@ -302,31 +384,37 @@ export const UsersPage = () => {
                         </IconButton>
                       </Tooltip>
                     )}
-                    <Tooltip title={user.status === 'active' ? 'Deactivate user' : 'Activate user'}>
-                      <IconButton
-                        size="small"
-                        aria-label="Toggle active user"
-                        onClick={() => void handleToggleActive(user)}
-                      >
-                        {user.status === 'active' ? (
-                          <ToggleOnIcon fontSize="small" color="success" />
-                        ) : (
-                          <ToggleOffIcon fontSize="small" />
-                        )}
-                      </IconButton>
+                    <Tooltip title={isSelfUser(user) ? selfActionTooltip : user.status === 'active' ? 'Deactivate user' : 'Activate user'}>
+                      <span>
+                        <IconButton
+                          size="small"
+                          aria-label="Toggle active user"
+                          disabled={isSelfUser(user)}
+                          onClick={() => void handleToggleActive(user)}
+                        >
+                          {user.status === 'active' ? (
+                            <ToggleOnIcon fontSize="small" color="success" />
+                          ) : (
+                            <ToggleOffIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                      </span>
                     </Tooltip>
                     </>
                   )}
                   {canDeleteUser && (
-                    <Tooltip title="Delete user">
-                      <IconButton
-                        size="small"
-                        aria-label="Delete user"
-                        color="error"
-                        onClick={() => setDeleteUser(user)}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+                    <Tooltip title={isSelfUser(user) ? selfActionTooltip : 'Delete user'}>
+                      <span>
+                        <IconButton
+                          size="small"
+                          aria-label="Delete user"
+                          color="error"
+                          disabled={isSelfUser(user)}
+                          onClick={() => setDeleteUser(user)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </span>
                     </Tooltip>
                   )}
                 </Stack>
@@ -400,11 +488,27 @@ export const UsersPage = () => {
               />
             )}
           />
+          {devVerificationUrl && (
+            <Alert
+              severity="success"
+              action={(
+                <AppButton
+                  type="button"
+                  size="small"
+                  onClick={() => window.open(devVerificationUrl, '_blank', 'noopener,noreferrer')}
+                >
+                  Open verification link
+                </AppButton>
+              )}
+            >
+              User created. Use the development verification link to verify this account.
+            </Alert>
+          )}
           <DialogActions sx={{ px: 0 }}>
-            <AppButton variant="outlined" color="inherit" onClick={closeFormDialog}>
+            <AppButton type="button" variant="outlined" color="inherit" onClick={closeFormDialog}>
               Cancel
             </AppButton>
-            <AppButton type="submit" loading={isSubmitting}>
+            <AppButton type="submit" loading={isSubmitting} disabled={!editingUser && Boolean(devVerificationUrl)}>
               {editingUser ? 'Save user' : 'Create user'}
             </AppButton>
           </DialogActions>

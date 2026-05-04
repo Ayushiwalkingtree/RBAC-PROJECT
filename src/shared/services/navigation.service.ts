@@ -27,8 +27,10 @@ export const pathForResource = (resource: ResourceRecord): string => {
   if (key.includes('ROLE') || key === 'ADMIN_MENU') return '/roles';
   if (key.includes('PERM')) return '/permissions';
   if (key.includes('RESOURCE')) return '/resource-registry';
+  if (key.includes('TENANT_ADMIN_ACCESS')) return '/tenant-admin-access';
   if (key.includes('AUDIT')) return '/audit-logs';
   if (key.includes('NAV_PREVIEW')) return '/nav-preview';
+  if (key.includes('NAV_ORDER')) return '/navigation-order';
   if (key.includes('REPORT')) return '/reports';
   if (key.includes('LOAN') || key.includes('TICKET')) return '/tickets';
   if (key.includes('SETTING')) return '/settings';
@@ -46,6 +48,7 @@ const fallbackIconForResource = (resource: ResourceRecord): string => {
   if (key.includes('LOAN') || key.includes('TICKET')) return 'tickets';
   if (key.includes('SETTING')) return 'settings';
   if (key.includes('NAV_PREVIEW')) return 'preview';
+  if (key.includes('NAV_ORDER')) return 'preview';
   return 'dashboard';
 };
 
@@ -60,7 +63,7 @@ const isPlatformSuperAdmin = (currentUser?: Pick<AuthUser, 'orgCode' | 'roles'>)
   currentUser?.orgCode === 'PLATFORM' && currentUser.roles.some((role) => role.toUpperCase().includes('SUPER ADMIN'));
 
 const bySequence = (current: NavigationItem, next: NavigationItem): number =>
-  current.sequenceNo - next.sequenceNo || current.label.localeCompare(next.label);
+  current.sequenceNo - next.sequenceNo;
 
 const toNavigationItem = (resource: ResourceRecord): NavigationItem => ({
   id: resource.id,

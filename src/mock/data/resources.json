@@ -368,7 +368,7 @@
   },
   {
     "id": "res-permissions-menu",
-    "resourceKey": "PERMISSIONS_MENU",
+    "resourceKey": "PERMISSION_MATRIX_MENU",
     "resourceName": "Permission Matrix",
     "resourceType": "MENU",
     "resourceGroup": "Administration",
@@ -418,6 +418,23 @@
     "isActive": true
   },
   {
+    "id": "res-tenant-admin-access-menu",
+    "resourceKey": "TENANT_ADMIN_ACCESS_MENU",
+    "resourceName": "Tenant Admin Access",
+    "resourceType": "MENU",
+    "resourceGroup": "Platform",
+    "description": "Platform tenant admin access control",
+    "allowedPermissions": [
+      { "key": "VIEW", "label": "View" }
+    ],
+    "sequenceNo": 75,
+    "parentResourceKey": "ADMIN_MENU",
+    "isUiVisible": true,
+    "isActive": true,
+    "uiPath": "/tenant-admin-access",
+    "icon": "roles"
+  },
+  {
     "id": "res-nav-preview-menu",
     "resourceKey": "NAV_PREVIEW_MENU",
     "resourceName": "Nav Preview",
@@ -432,6 +449,40 @@
     "isActive": true,
     "uiPath": "/nav-preview",
     "icon": "preview"
+  },
+  {
+    "id": "res-nav-order-menu",
+    "resourceKey": "NAV_ORDER_MENU",
+    "resourceName": "Navigation Order",
+    "resourceType": "MENU",
+    "resourceGroup": "Administration",
+    "description": "Navigation order management menu",
+    "allowedPermissions": [
+      { "key": "VIEW", "label": "View" }
+    ],
+    "sequenceNo": 85,
+    "parentResourceKey": "ADMIN_MENU",
+    "isUiVisible": true,
+    "isActive": true,
+    "uiPath": "/navigation-order",
+    "icon": "preview"
+  },
+  {
+    "id": "res-nav-order-api",
+    "resourceKey": "NAV_ORDER_API",
+    "resourceName": "Navigation Order API",
+    "resourceType": "API",
+    "resourceGroup": "Administration",
+    "description": "Update organization navigation order",
+    "allowedPermissions": [
+      { "key": "READ", "label": "Read" },
+      { "key": "UPDATE", "label": "Update" }
+    ],
+    "httpMethod": "PUT",
+    "apiPath": "/api/navigation/order",
+    "microservice": "identity",
+    "isUiVisible": false,
+    "isActive": true
   },
   {
     "id": "res-settings-menu",

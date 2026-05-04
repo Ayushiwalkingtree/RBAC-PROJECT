@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import nullslast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.resource import Resource, ResourcePermission
@@ -19,7 +19,11 @@ class ResourceRepository:
         return result.scalar_one_or_none()
 
     async def list_active(self) -> list[Resource]:
-        result = await self.session.execute(select(Resource).where(Resource.is_deleted.is_(False)).order_by(Resource.sequence_no, Resource.resource_key))
+        result = await self.session.execute(
+            select(Resource)
+            .where(Resource.is_deleted.is_(False))
+            .order_by(nullslast(Resource.sequence_no.asc()), Resource.id.asc())
+        )
         return list(result.scalars())
 
     async def permission_by_resource_id(self, resource_id: int) -> ResourcePermission | None:

@@ -13,7 +13,9 @@ export const ROUTES = {
   auditLogs: '/audit-logs',
   settings: '/settings',
   resourceRegistry: '/resource-registry',
+  tenantAdminAccess: '/tenant-admin-access',
   navPreview: '/nav-preview',
+  navigationOrder: '/navigation-order',
 } as const;
 
 export const ROUTE_PERMISSIONS = {
@@ -29,5 +31,10 @@ export const ROUTE_PERMISSIONS = {
     resource: RESOURCE_KEYS.resourceRegistryMenu,
     permission: PERMISSION_KEYS.view,
   },
+  [ROUTES.tenantAdminAccess]: {
+    resource: RESOURCE_KEYS.tenantAdminAccessMenu,
+    permission: PERMISSION_KEYS.view,
+  },
   [ROUTES.navPreview]: { resource: RESOURCE_KEYS.navPreviewMenu, permission: PERMISSION_KEYS.view },
+  [ROUTES.navigationOrder]: { resource: RESOURCE_KEYS.navOrderMenu, permission: PERMISSION_KEYS.view },
 } as const;

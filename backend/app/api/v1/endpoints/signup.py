@@ -16,5 +16,5 @@ async def signup(payload: SignupRequest, request: Request, session: DbSession):
 
 @router.post("/verify-email")
 async def verify_email(payload: VerifyEmailRequest, request: Request, session: DbSession):
-    await SignupService(session).verify_email(payload.token)
-    return api_response(request, {"verified": True})
+    message = await SignupService(session).verify_email(payload.token)
+    return api_response(request, {"verified": True, "message": message})

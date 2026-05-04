@@ -10,6 +10,7 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.signup import SignupRequest, SignupResponse
 from app.services.audit_service import AuditService
 from app.services.email_service import EmailService
+from app.services.verification_store import get_verification_token, pop_verification_token, store_verification_token
 from app.utils.datetime import utcnow
 from app.utils.password import hash_password
 from app.utils.tokens import new_verification_token
@@ -29,12 +30,21 @@ CORE_ORG_ADMIN_PERMISSIONS: dict[str, list[str]] = {
     "PERMISSION_MATRIX_MENU": ["VIEW"],
     "SETTINGS_MENU": ["VIEW"],
     "AUDIT_LOG_MENU": ["VIEW"],
+    "NAV_ORDER_MENU": ["VIEW"],
+    "NAV_ORDER_API": ["READ", "UPDATE"],
     "DASH_MENU": ["VIEW"],
     "DASH_MAIN": ["VIEW"],
     "REPORTS_MENU": ["VIEW"],
 }
 
-_verification_tokens: dict[str, tuple[int, int]] = {}
+def dev_verification_url(token: str) -> str | None:
+    if (
+        settings.env == "development"
+        and settings.email_provider.lower() == "console"
+        and settings.expose_dev_verification_link
+    ):
+        return f"{settings.frontend_verify_email_url}?token={token}"
+    return None
 
 
 class SignupService:
@@ -105,7 +115,7 @@ class SignupService:
         )
 
         token = new_verification_token()
-        _verification_tokens[token] = (org.id, user.id)
+        store_verification_token(token, org.id, user.id)
         verification_url = f"{settings.frontend_verify_email_url}?token={token}"
         await self.email_service.send_verification_email(
             user.email,
@@ -129,17 +139,24 @@ class SignupService:
             org_code=org.org_code,
             admin_user_id=user.id,
             message="Organization created. Please verify your email using the link sent to your inbox.",
+            dev_verification_url=dev_verification_url(token),
         )
 
-    async def verify_email(self, token: str) -> None:
-        token_data = _verification_tokens.pop(token, None)
+    async def verify_email(self, token: str) -> str:
+        token_data = get_verification_token(token)
         if not token_data:
-            raise AppError(404, "INVALID_VERIFICATION_TOKEN", "Verification token was not found")
+            raise AppError(400, "INVALID_OR_EXPIRED_TOKEN", "Invalid or expired verification link")
         org_id, user_id = token_data
         user = await self.user_repo.get_scoped(org_id, user_id)
         org = await self.org_repo.get(org_id)
         if not user or not org:
-            raise AppError(404, "INVALID_VERIFICATION_TOKEN", "Verification token was not found")
+            pop_verification_token(token)
+            raise AppError(400, "INVALID_OR_EXPIRED_TOKEN", "Invalid or expired verification link")
+        if user.is_email_verified:
+            org.is_verified = True
+            pop_verification_token(token)
+            await self.session.commit()
+            return "Email already verified. You can sign in."
         user.is_email_verified = True
         org.is_verified = True
         await self.audit.write(
@@ -153,4 +170,6 @@ class SignupService:
             old_value_json={"is_email_verified": False, "organization_is_verified": False},
             new_value_json={"is_email_verified": True, "organization_is_verified": True},
         )
+        pop_verification_token(token)
         await self.session.commit()
+        return "Email verified successfully. You can now sign in."

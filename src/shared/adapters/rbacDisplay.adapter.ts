@@ -458,7 +458,9 @@ export const buildBusinessPermissionRows = (resources: ResourceRecord[]): Busine
         RESOURCE_KEYS.dashboardMain,
         RESOURCE_KEYS.dashboardRisk,
         RESOURCE_KEYS.resourceRegistryMenu,
+        RESOURCE_KEYS.tenantAdminAccessMenu,
         RESOURCE_KEYS.navPreviewMenu,
+        RESOURCE_KEYS.navOrderMenu,
         RESOURCE_KEYS.settingsMenu,
       ]);
       return !hiddenBusinessKeys.has(resource.resourceKey);

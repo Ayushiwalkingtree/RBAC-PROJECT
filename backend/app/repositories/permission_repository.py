@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.resource import Resource, ResourcePermission
 from app.models.role import RolePermission
+from app.utils.permission_normalization import normalize_available_permissions, normalize_role_permissions
 
 
 class PermissionRepository:
@@ -11,15 +12,7 @@ class PermissionRepository:
 
     @staticmethod
     def permission_keys(permissions: list) -> set[str]:
-        keys: set[str] = set()
-        for permission in permissions:
-            if isinstance(permission, dict):
-                key = permission.get("key")
-            else:
-                key = permission
-            if key:
-                keys.add(str(key).upper())
-        return keys
+        return {permission["key"] for permission in normalize_available_permissions(permissions)}
 
     async def allowed_permission_map(self) -> dict[str, set[str]]:
         result = await self.session.execute(
@@ -39,4 +32,7 @@ class PermissionRepository:
         result = await self.session.execute(
             select(RolePermission).where(RolePermission.is_deleted.is_(False))
         )
-        return any(permission_key in perms.permissions_json.get(resource_key, []) for perms in result.scalars())
+        return any(
+            permission_key.upper() in normalize_role_permissions(perms.permissions_json).get(resource_key.upper(), [])
+            for perms in result.scalars()
+        )

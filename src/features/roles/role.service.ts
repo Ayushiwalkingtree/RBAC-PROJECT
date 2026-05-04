@@ -1,5 +1,6 @@
 import { appendAuditLog, mockDbService } from '@/mock/services/mockDb.service';
 import { createId } from '@/shared/utils/id';
+import { apiClient, unwrapApiData, useMocks, type ApiEnvelope } from '@/shared/api/apiClient';
 import type { Role } from '@/shared/types/rbac.types';
 
 const normalizeCode = (value: string): string => value.trim().toUpperCase();
@@ -13,13 +14,46 @@ export type RoleInput = {
   actorEmail?: string;
 };
 
+type BackendRole = {
+  id: number;
+  role_id?: number | null;
+  role_code: string;
+  role_name: string;
+  description?: string | null;
+  is_system: boolean;
+};
+
+const mapBackendRole = (role: BackendRole, orgId: string): Role => ({
+  id: String(role.role_id ?? role.id),
+  orgId,
+  code: role.role_code,
+  name: role.role_name,
+  description: role.description ?? '',
+  permissions: {},
+  isSystem: role.is_system,
+});
+
 export const roleService = {
   listRoles: async (orgId: string): Promise<Role[]> => {
+    if (!useMocks) {
+      const response = await apiClient.get<ApiEnvelope<BackendRole[]>>('/roles');
+      return unwrapApiData(response.data).map((role) => mapBackendRole(role, orgId));
+    }
+
     const database = await mockDbService.getDatabase();
     return database.roles.filter((role) => role.orgId === orgId);
   },
 
   createRole: async (input: RoleInput): Promise<Role> => {
+    if (!useMocks) {
+      const response = await apiClient.post<ApiEnvelope<BackendRole>>('/roles', {
+        role_code: input.role_code,
+        role_name: input.role_name,
+        description: input.description,
+      });
+      return mapBackendRole(unwrapApiData(response.data), input.orgId);
+    }
+
     let createdRole: Role | null = null;
     await mockDbService.updateDatabase((database) => {
       const duplicate = database.roles.some(
@@ -62,6 +96,15 @@ export const roleService = {
   },
 
   updateRole: async (roleId: string, input: RoleInput): Promise<Role> => {
+    if (!useMocks) {
+      const response = await apiClient.put<ApiEnvelope<BackendRole>>(`/roles/${roleId}`, {
+        role_code: input.role_code,
+        role_name: input.role_name,
+        description: input.description,
+      });
+      return mapBackendRole(unwrapApiData(response.data), input.orgId);
+    }
+
     let updatedRole: Role | null = null;
     await mockDbService.updateDatabase((database) => {
       const duplicate = database.roles.some(
@@ -102,6 +145,12 @@ export const roleService = {
   },
 
   deleteRole: async (roleId: string): Promise<void> => {
+    if (!useMocks) {
+      const response = await apiClient.delete<ApiEnvelope<{ deleted: boolean }>>(`/roles/${roleId}`);
+      unwrapApiData(response.data);
+      return;
+    }
+
     await mockDbService.updateDatabase((database) => {
       const role = database.roles.find((candidate) => candidate.id === roleId);
       if (!role) {

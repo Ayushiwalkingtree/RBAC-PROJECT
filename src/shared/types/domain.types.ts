@@ -22,19 +22,7 @@ export type TenantSetting = {
   value: string;
 };
 
-export type AuditAction =
-  | 'ORG_CREATED'
-  | 'EMAIL_VERIFIED'
-  | 'USER_LOGIN'
-  | 'USER_LOGOUT'
-  | 'USER_CREATED'
-  | 'ROLE_CREATED'
-  | 'ROLE_ASSIGNED'
-  | 'ROLE_REMOVED'
-  | 'PERM_GRANTED'
-  | 'RESOURCE_CREATED'
-  | 'RESOURCE_UPDATED'
-  | 'ORG_UPDATED';
+export type AuditAction = string;
 
 export type AuditLog = {
   id: string;

@@ -21,6 +21,7 @@ import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useToast } from '@/shared/components/useToast';
 import { PermissionGuard } from '@/shared/components/guards/PermissionGuard';
+import { useMocks } from '@/shared/api/apiClient';
 import { PERMISSION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
 import { THEME_OPTIONS } from '@/shared/theme/theme.constants';
 import { useThemeStore } from '@/shared/theme/theme.store';
@@ -125,18 +126,20 @@ export const SettingsPage = () => {
 
   return (
     <>
-      <PageHeader title="Settings" subtitle="Tenant configuration and local mock database controls.">
+      <PageHeader title="Settings" subtitle="Tenant configuration.">
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
           <PermissionGuard resource={RESOURCE_KEYS.settingsManageApi} permission={PERMISSION_KEYS.update}>
             <AppButton startIcon={<SaveIcon />} loading={isSaving} onClick={() => void handleSave()}>
               Save settings
             </AppButton>
           </PermissionGuard>
-          <PermissionGuard resource={RESOURCE_KEYS.settingsManageApi} permission={PERMISSION_KEYS.update}>
-            <AppButton color="error" startIcon={<RestartAltIcon />} onClick={() => setResetOpen(true)}>
-              Reset Mock Data
-            </AppButton>
-          </PermissionGuard>
+          {useMocks && (
+            <PermissionGuard resource={RESOURCE_KEYS.settingsManageApi} permission={PERMISSION_KEYS.update}>
+              <AppButton color="error" startIcon={<RestartAltIcon />} onClick={() => setResetOpen(true)}>
+                Reset Mock Data
+              </AppButton>
+            </PermissionGuard>
+          )}
         </Stack>
       </PageHeader>
 

@@ -1,16 +1,27 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.errors import AppError
 from app.models.user import User, UserRole
+from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.role_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserCreate, UserUpdate
 from app.services.audit_service import AuditService
+from app.services.email_service import EmailService
+from app.services.verification_store import store_verification_token
 from app.utils.datetime import utcnow
 from app.utils.password import hash_password
 from app.utils.tokens import new_verification_token
 
-_user_verification_tokens: dict[str, tuple[int, int]] = {}
+def dev_verification_url(token: str) -> str | None:
+    if (
+        settings.env == "development"
+        and settings.email_provider.lower() == "console"
+        and settings.expose_dev_verification_link
+    ):
+        return f"{settings.frontend_verify_email_url}?token={token}"
+    return None
 
 
 class UserService:
@@ -18,11 +29,20 @@ class UserService:
         self.session = session
         self.repo = UserRepository(session)
         self.role_repo = RoleRepository(session)
+        self.org_repo = OrganizationRepository(session)
         self.audit = AuditService(session)
+        self.email_service = EmailService()
 
-    async def create(self, org_id: int, payload: UserCreate, actor_user_id: int) -> tuple[User, str]:
-        if await self.repo.get_by_email(org_id, str(payload.email)):
-            raise AppError(409, "EMAIL_EXISTS", "Email already exists in this organization")
+    async def create(self, org_id: int, payload: UserCreate, actor_user_id: int) -> tuple[User, str | None]:
+        org = await self.org_repo.get(org_id)
+        if not org or org.is_deleted:
+            raise AppError(404, "ORGANIZATION_NOT_FOUND", "Organization was not found")
+        existing_user = await self.repo.get_by_email(org_id, str(payload.email))
+        if existing_user:
+            message = "This email already exists in the selected organization."
+            if not existing_user.is_email_verified:
+                message += " User already exists but is not verified. Resend verification email."
+            raise AppError(409, "EMAIL_EXISTS", message)
         for role_id in payload.role_ids:
             if not await self.role_repo.get_scoped(org_id, role_id):
                 raise AppError(404, "ROLE_NOT_FOUND", "Role was not found")
@@ -51,7 +71,14 @@ class UserService:
                 )
             )
         token = new_verification_token()
-        _user_verification_tokens[token] = (org_id, user.id)
+        store_verification_token(token, org_id, user.id)
+        verification_url = f"{settings.frontend_verify_email_url}?token={token}"
+        await self.email_service.send_verification_email(
+            user.email,
+            user.full_name,
+            org.org_name,
+            verification_url,
+        )
         await self.audit.write(
             org_id,
             "USER_CREATED",
@@ -62,7 +89,7 @@ class UserService:
             new_value_json={"email": user.email, "full_name": user.full_name, "role_ids": payload.role_ids},
         )
         await self.session.commit()
-        return user, token
+        return user, dev_verification_url(token)
 
     async def update(self, org_id: int, user_id: int, payload: UserUpdate, actor_user_id: int | None = None) -> User:
         user = await self.repo.get_scoped(org_id, user_id)

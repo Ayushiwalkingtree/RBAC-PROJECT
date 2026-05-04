@@ -26,12 +26,14 @@ export type UserRecord = {
   department: string;
   status: 'active' | 'invited' | 'disabled';
   roleIds: string[];
+  roleCodes?: string[];
   isDeleted?: boolean;
   isEmailVerified?: boolean;
   failedAttempts?: number;
   lockedUntil?: string | null;
   lastLoginAt?: string;
   createdAt?: string;
+  devVerificationUrl?: string;
 };
 
 export type AuthUser = Omit<UserRecord, 'password' | 'roleIds'> & {
@@ -71,5 +73,6 @@ export type SignupResult = {
   org: Organization;
   user: UserRecord;
   verificationToken?: string;
+  devVerificationUrl?: string;
   message?: string;
 };

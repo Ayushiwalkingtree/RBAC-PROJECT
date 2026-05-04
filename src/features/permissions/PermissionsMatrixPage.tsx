@@ -1,6 +1,6 @@
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Chip, Divider, Paper, Stack, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Chip, CircularProgress, Divider, Paper, Stack, Tooltip, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { permissionService } from '@/features/permissions/permission.service';
@@ -34,6 +34,8 @@ export const PermissionsMatrixPage = () => {
   const [draftPermissions, setDraftPermissions] = useState<RolePermissionGrants>({});
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   const canConfigure = can(RESOURCE_KEYS.permissionGrantApi, PERMISSION_KEYS.configure);
   const selectedRole = roles.find((role) => role.id === selectedRoleId);
@@ -51,14 +53,24 @@ export const PermissionsMatrixPage = () => {
   const loadMatrix = async () => {
     if (!session) return;
 
-    const matrix = await permissionService.getRolePermissionsMatrix(session.org.id);
-    setRoles(matrix.roles);
-    setResources(matrix.resources);
-    const nextRoleId = selectedRoleId || matrix.roles[0]?.id || '';
-    setSelectedRoleId(nextRoleId);
-    const role = matrix.roles.find((candidate) => candidate.id === nextRoleId);
-    setDraftPermissions(role?.permissions ?? {});
-    setIsDirty(false);
+    setIsLoading(true);
+    setLoadError('');
+    try {
+      const matrix = await permissionService.getRolePermissionsMatrix(session.org.id);
+      setRoles(matrix.roles);
+      setResources(matrix.resources);
+      const nextRoleId = selectedRoleId || matrix.roles[0]?.id || '';
+      setSelectedRoleId(nextRoleId);
+      const role = matrix.roles.find((candidate) => candidate.id === nextRoleId);
+      setDraftPermissions(role?.permissions ?? {});
+      setIsDirty(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load permission matrix.';
+      setLoadError(message);
+      showToast(message, 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -95,7 +107,7 @@ export const PermissionsMatrixPage = () => {
       });
       await loadMatrix();
       await refreshSession();
-      showToast('Permissions saved.');
+      showToast('Permissions saved. Changes apply after next login or token refresh.');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Unable to save permissions.', 'error');
     } finally {
@@ -120,8 +132,13 @@ export const PermissionsMatrixPage = () => {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '320px 1fr' }, gap: 2 }}>
         <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2, minHeight: 620 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Roles</Typography>
-          <Stack spacing={1}>
-            {roles.map((role) => (
+          {isLoading ? (
+            <Stack alignItems="center" sx={{ py: 6 }}>
+              <CircularProgress size={28} />
+            </Stack>
+          ) : (
+            <Stack spacing={1}>
+              {roles.map((role) => (
               <Paper
                 key={role.id}
                 elevation={0}
@@ -140,12 +157,19 @@ export const PermissionsMatrixPage = () => {
                 <Typography variant="caption" color="text.secondary">{role.name}</Typography>
                 <Typography variant="caption" display="block">{countGrants(role.permissions)} grants</Typography>
               </Paper>
-            ))}
-          </Stack>
+              ))}
+            </Stack>
+          )}
         </Paper>
 
         <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2, minHeight: 620 }}>
-          {!selectedRole ? (
+          {loadError ? (
+            <Alert severity="error">{loadError}</Alert>
+          ) : isLoading ? (
+            <Stack alignItems="center" justifyContent="center" sx={{ minHeight: 500 }}>
+              <CircularProgress />
+            </Stack>
+          ) : !selectedRole ? (
             <EmptyState title="No role selected" description="Select a role to configure permissions." />
           ) : (
             <Stack spacing={2}>

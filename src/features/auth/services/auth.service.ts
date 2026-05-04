@@ -30,6 +30,7 @@ type BackendSignupResponse = {
   admin_user_id: number;
   admin_role_code: string;
   message: string;
+  dev_verification_url?: string | null;
 };
 
 type BackendAuthResponse = {
@@ -52,6 +53,11 @@ type BackendAuthResponse = {
   roles: string[];
   perms: Record<string, string[]>;
   nav: BackendNavigationItem[];
+};
+
+type BackendVerifyEmailResponse = {
+  verified: boolean;
+  message?: string;
 };
 
 type BackendNavigationItem = {
@@ -101,6 +107,7 @@ const coreOrgAdminPermissions: Role['permissions'] = {
   [RESOURCE_KEYS.adminMenu]: [PERMISSION_KEYS.view],
   [RESOURCE_KEYS.auditLogsMenu]: [PERMISSION_KEYS.view],
   [RESOURCE_KEYS.permissionsMenu]: [PERMISSION_KEYS.view],
+  [RESOURCE_KEYS.settingsMenu]: [PERMISSION_KEYS.view],
 };
 
 const buildSession = (
@@ -259,7 +266,9 @@ export const authService = {
           status: 'active',
           roleIds: [payload.admin_role_code],
           isEmailVerified: false,
+          devVerificationUrl: payload.dev_verification_url ?? undefined,
         },
+        devVerificationUrl: payload.dev_verification_url ?? undefined,
         message: payload.message,
       };
     }
@@ -368,10 +377,10 @@ export const authService = {
     return database.verificationTokens.find((candidate) => candidate.token === token);
   },
 
-  verifyEmail: async (token: string): Promise<void> => {
+  verifyEmail: async (token: string): Promise<string> => {
     if (!useMocks) {
-      await apiClient.post('/verify-email', { token });
-      return;
+      const response = await apiClient.post<ApiEnvelope<BackendVerifyEmailResponse>>('/verify-email', { token });
+      return unwrapApiData(response.data).message ?? 'Email verified successfully. You can now sign in.';
     }
 
     await mockDbService.updateDatabase((database) => {
@@ -407,6 +416,8 @@ export const authService = {
         message: `${user?.email ?? verificationToken.email} verified email.`,
       });
     });
+
+    return 'Email verified successfully. You can now sign in.';
   },
 
   login: async (credentials: LoginCredentials): Promise<AuthSession> => {

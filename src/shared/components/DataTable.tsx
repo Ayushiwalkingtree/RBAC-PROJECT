@@ -7,6 +7,7 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
+import type { SxProps, Theme } from '@mui/material/styles';
 import type { ReactNode } from 'react';
 
 type Column<T> = {
@@ -19,9 +20,10 @@ type DataTableProps<T> = {
   columns: Column<T>[];
   rows: T[];
   getRowId: (row: T) => string;
+  getRowSx?: (row: T) => SxProps<Theme> | undefined;
 };
 
-export const DataTable = <T,>({ columns, rows, getRowId }: DataTableProps<T>) => (
+export const DataTable = <T,>({ columns, rows, getRowId, getRowSx }: DataTableProps<T>) => (
   <TableContainer component={Paper} elevation={0} sx={{ border: 1, borderColor: 'divider' }}>
     <Table>
       <TableHead>
@@ -38,7 +40,10 @@ export const DataTable = <T,>({ columns, rows, getRowId }: DataTableProps<T>) =>
           <TableRow
             key={getRowId(row)}
             hover
-            sx={{ transition: 'background-color 160ms ease, transform 160ms ease' }}
+            sx={{
+              transition: 'background-color 160ms ease, transform 160ms ease',
+              ...getRowSx?.(row),
+            }}
           >
             {columns.map((column) => (
               <TableCell key={column.id}>{column.render(row)}</TableCell>

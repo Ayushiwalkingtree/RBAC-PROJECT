@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.core.errors import AppError
 from app.core.rbac import build_nav_tree, merge_permissions
 from app.models.refresh_token import RefreshToken
+from app.repositories.navigation_repository import NavigationRepository
 from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.resource_repository import ResourceRepository
 from app.repositories.role_repository import RoleRepository
@@ -25,6 +26,7 @@ class AuthService:
         self.user_repo = UserRepository(session)
         self.role_repo = RoleRepository(session)
         self.resource_repo = ResourceRepository(session)
+        self.nav_repo = NavigationRepository(session)
         self.token_repo = TokenRepository(session)
         self.audit = AuditService(session)
 
@@ -55,7 +57,7 @@ class AuthService:
         current_roles = [role.role_code for role in roles if role.id in role_ids]
         perms = merge_permissions([permission.permissions_json for permission in role_perms])
         resources = await self.resource_repo.list_active()
-        nav = build_nav_tree(perms, resources)
+        nav = build_nav_tree(perms, resources, await self.nav_repo.combined_override_map(org.id, user.id))
         access_token, expires_at = create_access_token(
             {"sub": str(user.id), "org": str(org.id), "org_code": org.org_code, "roles": current_roles, "perms": perms, "nav": nav}
         )
@@ -99,7 +101,7 @@ class AuthService:
         role_perms = await self.role_repo.permissions_for_roles(role_ids)
         perms = merge_permissions([permission.permissions_json for permission in role_perms])
         resources = await self.resource_repo.list_active()
-        nav = build_nav_tree(perms, resources)
+        nav = build_nav_tree(perms, resources, await self.nav_repo.combined_override_map(org.id, user.id))
         access_token, expires_at = create_access_token(
             {"sub": str(user.id), "org": str(org.id), "org_code": org.org_code, "roles": current_roles, "perms": perms, "nav": nav}
         )
