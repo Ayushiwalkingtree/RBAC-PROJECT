@@ -3,6 +3,8 @@
     "dev:frontend": "cd frontend && npm run dev",
     "build:frontend": "cd frontend && npm run build",
     "lint:frontend": "cd frontend && npm run lint",
-    "dev:backend": "cd backend && uvicorn app.main:app --reload --port 8000"
+    "dev:core": "cd services/core-service && uvicorn app.main:app --reload --port 8000",
+    "dev:ticket": "cd services/ticket-service && uvicorn app.main:app --reload --port 9000",
+    "seed:core": "cd services/core-service && python scripts/seed.py"
   }
 }
