@@ -20,7 +20,7 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from 
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppButton } from '@/shared/components/AppButton';
 import { AppDialog } from '@/shared/components/AppDialog';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -29,10 +29,11 @@ import { PageHeader } from '@/shared/components/PageHeader';
 import { PermissionChip } from '@/shared/components/PermissionChip';
 import { useToast } from '@/shared/components/useToast';
 import { useAuthStore } from '@/features/auth/store/auth.store';
+import { usePermission } from '@/shared/hooks/usePermission';
 import { ResourceForm } from '@/features/resources/ResourceForm';
 import { emptyResourceFormValues, valuesFromResource } from '@/features/resources/resourceForm.utils';
 import { resourceService } from '@/features/resources/resource.service';
-import { RESOURCE_TYPES } from '@/shared/constants/permission.constants';
+import { PERMISSION_KEYS, RESOURCE_KEYS, RESOURCE_TYPES } from '@/shared/constants/permission.constants';
 import {
   buildBusinessPermissionRows,
   buildTechnicalPermissionRows,
@@ -53,7 +54,8 @@ const canManageResources = (
   sessionOrgCode?: string,
   roles: string[] = [],
 ): boolean =>
-  sessionOrgCode === 'PLATFORM' && roles.some((role) => role.toUpperCase().includes('SUPER ADMIN'));
+  sessionOrgCode === 'PLATFORM' &&
+  roles.some((role) => role.toUpperCase().replace(/[\s-]+/g, '_') === 'SUPER_ADMIN');
 
 type SortableNavigationRowProps = {
   resource: ResourceRecord;
@@ -113,6 +115,7 @@ const SortableNavigationRow = ({ resource, parentOptions, onParentChange }: Sort
 export const ResourceRegistryPage = () => {
   const session = useAuthStore((state) => state.session);
   const refreshSession = useAuthStore((state) => state.refreshSession);
+  const { can } = usePermission();
   const { showToast } = useToast();
   const [resources, setResources] = useState<ResourceRecord[]>([]);
   const [selectedRowId, setSelectedRowId] = useState('');
@@ -126,8 +129,14 @@ export const ResourceRegistryPage = () => {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const isPlatformSuperAdmin =
-    session?.org.code === 'PLATFORM' && session.user.roles.some((role) => role.toUpperCase().includes('SUPER ADMIN'));
-  const canManage = canManageResources(session?.org.code, session?.user.roles);
+    canManageResources(session?.org.code, session?.user.roles);
+  const canReadResources =
+    can(RESOURCE_KEYS.resourceManageApi, PERMISSION_KEYS.read) ||
+    can(RESOURCE_KEYS.resourceRegistryMenu, PERMISSION_KEYS.view);
+  const canCreateResource = can(RESOURCE_KEYS.resourceManageApi, PERMISSION_KEYS.create);
+  const canUpdateResource = can(RESOURCE_KEYS.resourceManageApi, PERMISSION_KEYS.update);
+  const canDeleteResource = can(RESOURCE_KEYS.resourceManageApi, PERMISSION_KEYS.delete);
+  const canManageNavigationOrder = isPlatformSuperAdmin && canUpdateResource;
   const isPlatform = session?.org.code === 'PLATFORM';
   const parentResources = resources.filter(
     (resource) => resource.resourceType === RESOURCE_TYPES.menu && resource.isActive,
@@ -162,14 +171,18 @@ export const ResourceRegistryPage = () => {
     [registryRows],
   );
 
-  const loadResources = async () => {
+  const loadResources = useCallback(async () => {
+    if (!canReadResources) {
+      setResources([]);
+      return;
+    }
     const nextResources = await resourceService.listResources();
     setResources(nextResources);
-  };
+  }, [canReadResources]);
 
   useEffect(() => {
     void loadResources();
-  }, []);
+  }, [loadResources]);
 
   const openCreate = () => {
     setEditingResource(null);
@@ -302,13 +315,13 @@ export const ResourceRegistryPage = () => {
               label="Show technical resources"
             />
           )}
-          {canManage && (
+          {canManageNavigationOrder && (
             <FormControlLabel
               control={<Switch checked={navigationOrderMode} onChange={(_, checked) => setNavigationOrderMode(checked)} />}
               label="Navigation Order"
             />
           )}
-          {canManage && (
+          {canCreateResource && (
             <AppButton startIcon={<AddIcon />} onClick={openCreate}>
               Create Resource
             </AppButton>
@@ -407,18 +420,22 @@ export const ResourceRegistryPage = () => {
                   </Stack>
                   <Typography variant="body2" color="text.secondary">{selectedRow.description}</Typography>
                 </Box>
-                {canManage && primaryResource && (showTechnicalResources || selectedRow.technicalResourceKeys.length === 1) && (
+                {primaryResource && (showTechnicalResources || selectedRow.technicalResourceKeys.length === 1) && (
                   <Stack direction="row" spacing={1}>
-                    <Tooltip title="Edit resource">
-                      <IconButton onClick={() => openEdit(primaryResource)} aria-label="Edit resource">
-                        <EditIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete resource">
-                      <IconButton color="error" onClick={() => setDeletingResource(primaryResource)} aria-label="Delete resource">
-                        <DeleteIcon />
-                      </IconButton>
-                    </Tooltip>
+                    {canUpdateResource && (
+                      <Tooltip title="Edit resource">
+                        <IconButton onClick={() => openEdit(primaryResource)} aria-label="Edit resource">
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {canDeleteResource && (
+                      <Tooltip title="Delete resource">
+                        <IconButton color="error" onClick={() => setDeletingResource(primaryResource)} aria-label="Delete resource">
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </Stack>
                 )}
               </Stack>
