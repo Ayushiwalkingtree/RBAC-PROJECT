@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 
-from app.dependencies.auth import CurrentClaims
+from app.dependencies.auth import CurrentClaims, get_current_org_id, get_current_user_id
 from app.dependencies.db import DbSession
 from app.schemas.auth import LoginRequest, LogoutRequest, RefreshRequest
 from app.services.auth_service import AuthService
@@ -28,5 +28,6 @@ async def logout(payload: LogoutRequest, request: Request, session: DbSession, c
 
 
 @router.get("/me")
-async def me(request: Request, claims: CurrentClaims):
-    return api_response(request, claims)
+async def me(request: Request, session: DbSession, claims: CurrentClaims):
+    result = await AuthService(session).current_claims(get_current_org_id(claims), get_current_user_id(claims))
+    return api_response(request, result)

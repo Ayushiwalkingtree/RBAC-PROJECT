@@ -1,6 +1,4 @@
 import { PERMISSION_KEYS, RESOURCE_TYPES } from '@/shared/constants/permission.constants';
-import { canAccess } from '@/shared/utils/rbac';
-import type { AuthUser } from '@/shared/types/auth.types';
 import type { EffectivePermissions, ResourceRecord } from '@/shared/types/rbac.types';
 import type { NavigationItem } from '@/shared/types/navigation.types';
 
@@ -59,9 +57,6 @@ const navigableTypes = new Set<string>([
   RESOURCE_TYPES.report,
 ]);
 
-const isPlatformSuperAdmin = (currentUser?: Pick<AuthUser, 'orgCode' | 'roles'>): boolean =>
-  currentUser?.orgCode === 'PLATFORM' && currentUser.roles.some((role) => role.toUpperCase().includes('SUPER ADMIN'));
-
 const bySequence = (current: NavigationItem, next: NavigationItem): number =>
   current.sequenceNo - next.sequenceNo;
 
@@ -82,9 +77,7 @@ export const navigationService = {
   buildNavigation: (
     resources: ResourceRecord[],
     permissions: EffectivePermissions,
-    currentUser?: Pick<AuthUser, 'orgCode' | 'roles'>,
   ): NavigationItem[] => {
-    const isSuperAdmin = isPlatformSuperAdmin(currentUser);
     const navigableResources = resources.filter(
       (resource) =>
         resource.isActive &&
@@ -95,7 +88,7 @@ export const navigationService = {
     const visibleResourceKeys = new Set<string>();
 
     navigableResources.forEach((resource) => {
-      if (isSuperAdmin || canAccess(permissions, resource.resourceKey, PERMISSION_KEYS.view)) {
+      if ((permissions[resource.resourceKey.toUpperCase()] ?? []).includes(PERMISSION_KEYS.view)) {
         visibleResourceKeys.add(resource.resourceKey);
         let parentKey = resource.parentResourceKey;
         while (parentKey && resourcesByKey.has(parentKey)) {

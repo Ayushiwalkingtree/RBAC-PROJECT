@@ -14,6 +14,7 @@ export const resourceSchema = z.object({
   description: z.string().optional(),
   sequence_no: z.coerce.number().optional(),
   parent_resource_key: z.string().optional(),
+  ui_path: z.string().optional(),
   http_method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional().or(z.literal('')),
   api_path: z.string().optional(),
   microservice: z.string().optional(),

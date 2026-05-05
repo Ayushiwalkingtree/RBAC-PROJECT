@@ -101,13 +101,22 @@ export const PermissionsMatrixPage = () => {
 
     setIsSaving(true);
     try {
+      const affectsCurrentSession = Boolean(
+        selectedRole?.code && session?.user.roles.includes(selectedRole.code),
+      );
       await permissionService.updateRolePermissions(selectedRoleId, draftPermissions, {
         userId: session?.user.id,
         email: session?.user.email,
       });
+      if (affectsCurrentSession) {
+        await refreshSession();
+      }
       await loadMatrix();
-      await refreshSession();
-      showToast('Permissions saved. Changes apply after next login or token refresh.');
+      showToast(
+        affectsCurrentSession
+          ? 'Permissions updated. Navigation refreshed.'
+          : 'Permissions updated.',
+      );
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Unable to save permissions.', 'error');
     } finally {

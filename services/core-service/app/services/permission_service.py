@@ -2,6 +2,7 @@ from sqlalchemy import nullslast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError
+from app.core.rbac import NAV_TYPES
 from app.models.resource import Resource, ResourcePermission
 from app.models.role import RolePermission
 from app.repositories.permission_repository import PermissionRepository
@@ -47,6 +48,8 @@ class PermissionService:
                 continue
             granted_permissions = set(grants.get(resource.resource_key.upper(), []))
             available_permissions = normalize_available_permissions(available_permissions_raw)
+            if not available_permissions and resource.is_ui_visible and resource.resource_type in NAV_TYPES:
+                available_permissions = [{"key": "VIEW", "label": "View"}]
             if not include_all_permission_keys:
                 allowed_keys = set((visible_permissions or {}).get(resource.resource_key, []))
                 available_permissions = [

@@ -98,6 +98,7 @@ export const NavigationOrderPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const permissionFingerprint = JSON.stringify(session?.permissions ?? {});
 
   const loadNavigation = async () => {
     setIsLoading(true);
@@ -118,7 +119,7 @@ export const NavigationOrderPage = () => {
   useEffect(() => {
     void loadNavigation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, permissionFingerprint]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;

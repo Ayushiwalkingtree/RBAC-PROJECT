@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError
-from app.core.rbac import NAV_TYPES, build_nav_tree, has_permission, merge_permissions
+from app.core.rbac import NAV_TYPES, build_nav_tree, has_view_grant, merge_permissions
 from app.models.navigation import OrganizationNavOrder, UserNavOrder
 from app.repositories.navigation_repository import NavigationRepository
 from app.repositories.resource_repository import ResourceRepository
@@ -21,8 +21,6 @@ class NavigationOrderService:
         self,
         org_id: int,
         perms: dict[str, list[str]],
-        *,
-        is_platform_super_admin: bool = False,
     ) -> list[dict]:
         resources = await self.resource_repo.list_active()
         nav_resources = [
@@ -31,11 +29,10 @@ class NavigationOrderService:
             if resource.is_active
             and resource.is_ui_visible
             and resource.resource_type in NAV_TYPES
-            and (is_platform_super_admin or has_permission(perms, resource.resource_key, "VIEW"))
+            and has_view_grant(perms, resource.resource_key)
         ]
-        overrides = {} if is_platform_super_admin else await self.nav_repo.override_map(org_id)
         grant_map = {resource.resource_key: ["VIEW"] for resource in nav_resources}
-        return build_nav_tree(grant_map, nav_resources, overrides)
+        return build_nav_tree(grant_map, nav_resources, await self.nav_repo.override_map(org_id))
 
     async def list_user_order(self, org_id: int, user_id: int) -> list[dict]:
         perms = await self._permissions_for_user(org_id, user_id)
@@ -46,7 +43,7 @@ class NavigationOrderService:
             if resource.is_active
             and resource.is_ui_visible
             and resource.resource_type in NAV_TYPES
-            and has_permission(perms, resource.resource_key, "VIEW")
+            and has_view_grant(perms, resource.resource_key)
         ]
         grant_map = {resource.resource_key: ["VIEW"] for resource in nav_resources}
         return build_nav_tree(grant_map, nav_resources, await self.nav_repo.combined_override_map(org_id, user_id))
@@ -57,8 +54,6 @@ class NavigationOrderService:
         items: list[dict],
         actor_user_id: int,
         perms: dict[str, list[str]],
-        *,
-        is_platform_super_admin: bool = False,
     ) -> None:
         resources = {resource.resource_key: resource for resource in await self.resource_repo.list_active()}
         parent_by_key = {resource_key: resource.parent_resource_key for resource_key, resource in resources.items()}
@@ -66,14 +61,14 @@ class NavigationOrderService:
             resource_key = str(item.get("resource_key", "")).upper()
             if resource_key not in resources or resources[resource_key].resource_type not in NAV_TYPES:
                 raise AppError(422, "INVALID_NAV_RESOURCE", f"Unknown navigation resource {resource_key}")
-            if not is_platform_super_admin and not has_permission(perms, resource_key, "VIEW"):
+            if not has_view_grant(perms, resource_key):
                 raise AppError(403, "FORBIDDEN", f"Cannot update order for hidden resource {resource_key}")
             parent_key = item.get("parent_resource_key")
             if parent_key:
                 parent_key = str(parent_key).upper()
                 if parent_key not in resources or resources[parent_key].resource_type not in NAV_TYPES:
                     raise AppError(422, "INVALID_NAV_PARENT", f"Unknown navigation parent {parent_key}")
-                if not is_platform_super_admin and not has_permission(perms, parent_key, "VIEW"):
+                if not has_view_grant(perms, parent_key):
                     raise AppError(403, "FORBIDDEN", f"Cannot move under hidden parent {parent_key}")
                 if parent_key == resource_key:
                     raise AppError(422, "INVALID_NAV_PARENT", "Navigation item cannot be its own parent")
@@ -86,22 +81,16 @@ class NavigationOrderService:
                     raise AppError(422, "INVALID_NAV_PARENT", "Navigation parent cannot create a cycle")
                 visited.add(next_parent)
                 next_parent = parent_by_key.get(next_parent)
-            if is_platform_super_admin:
-                resource = resources[resource_key]
-                resource.parent_resource_key = parent_key
-                resource.sequence_no = sequence_no
-                resource.updated_by = actor_user_id
-            else:
-                override = await self.nav_repo.get_override(org_id, resource_key)
-                if not override:
-                    override = OrganizationNavOrder(
-                        at_organization_id=org_id,
-                        resource_key=resource_key,
-                    )
-                    self.session.add(override)
-                override.parent_resource_key = parent_key
-                override.sequence_no = sequence_no
-                override.updated_by = actor_user_id
+            override = await self.nav_repo.get_override(org_id, resource_key)
+            if not override:
+                override = OrganizationNavOrder(
+                    at_organization_id=org_id,
+                    resource_key=resource_key,
+                )
+                self.session.add(override)
+            override.parent_resource_key = parent_key
+            override.sequence_no = sequence_no
+            override.updated_by = actor_user_id
         await self.session.commit()
 
     async def save_user_order(
@@ -122,14 +111,14 @@ class NavigationOrderService:
             resource_key = str(item.get("resource_key", "")).upper()
             if resource_key not in resources or resources[resource_key].resource_type not in NAV_TYPES:
                 raise AppError(422, "INVALID_NAV_RESOURCE", f"Unknown navigation resource {resource_key}")
-            if not has_permission(perms, resource_key, "VIEW"):
+            if not has_view_grant(perms, resource_key):
                 raise AppError(403, "FORBIDDEN", f"Cannot update order for hidden resource {resource_key}")
             parent_key = item.get("parent_resource_key")
             if parent_key:
                 parent_key = str(parent_key).upper()
                 if parent_key not in resources or resources[parent_key].resource_type not in NAV_TYPES:
                     raise AppError(422, "INVALID_NAV_PARENT", f"Unknown navigation parent {parent_key}")
-                if not has_permission(perms, parent_key, "VIEW"):
+                if not has_view_grant(perms, parent_key):
                     raise AppError(403, "FORBIDDEN", f"Cannot move under hidden parent {parent_key}")
                 if parent_key == resource_key:
                     raise AppError(422, "INVALID_NAV_PARENT", "Navigation item cannot be its own parent")

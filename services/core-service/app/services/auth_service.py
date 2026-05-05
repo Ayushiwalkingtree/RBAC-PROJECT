@@ -2,7 +2,6 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.errors import AppError
 from app.core.rbac import build_nav_tree, merge_permissions
 from app.models.refresh_token import RefreshToken
@@ -30,6 +29,16 @@ class AuthService:
         self.token_repo = TokenRepository(session)
         self.audit = AuditService(session)
 
+    async def _session_access(self, org, user) -> tuple[list[str], dict[str, list[str]], list[dict]]:
+        role_ids = await self.user_repo.role_ids_for_user(user.id)
+        role_perms = await self.role_repo.permissions_for_roles(role_ids)
+        roles = await self.role_repo.list_scoped(org.id)
+        current_roles = [role.role_code for role in roles if role.id in role_ids]
+        perms = merge_permissions([permission.permissions_json for permission in role_perms])
+        resources = await self.resource_repo.list_active()
+        nav = build_nav_tree(perms, resources, await self.nav_repo.combined_override_map(org.id, user.id))
+        return current_roles, perms, nav
+
     async def login(self, payload: LoginRequest, user_agent: str | None = None) -> AuthResponse:
         org = await self.org_repo.get_by_code(payload.org_code)
         if not org or not org.is_active:
@@ -51,13 +60,7 @@ class AuthService:
             code = "ACCOUNT_LOCKED" if user.locked_until else "INVALID_CREDENTIALS"
             raise AppError(423 if user.locked_until else 401, code, "Wrong email or password")
 
-        role_ids = await self.user_repo.role_ids_for_user(user.id)
-        role_perms = await self.role_repo.permissions_for_roles(role_ids)
-        roles = await self.role_repo.list_scoped(org.id)
-        current_roles = [role.role_code for role in roles if role.id in role_ids]
-        perms = merge_permissions([permission.permissions_json for permission in role_perms])
-        resources = await self.resource_repo.list_active()
-        nav = build_nav_tree(perms, resources, await self.nav_repo.combined_override_map(org.id, user.id))
+        current_roles, perms, nav = await self._session_access(org, user)
         access_token, expires_at = create_access_token(
             {"sub": str(user.id), "org": str(org.id), "org_code": org.org_code, "roles": current_roles, "perms": perms, "nav": nav}
         )
@@ -95,13 +98,7 @@ class AuthService:
         org = await self.org_repo.get(stored.at_organization_id)
         if not user or not org:
             raise AppError(401, "INVALID_REFRESH_TOKEN", "Refresh token is invalid")
-        role_ids = await self.user_repo.role_ids_for_user(user.id)
-        roles = await self.role_repo.list_scoped(org.id)
-        current_roles = [role.role_code for role in roles if role.id in role_ids]
-        role_perms = await self.role_repo.permissions_for_roles(role_ids)
-        perms = merge_permissions([permission.permissions_json for permission in role_perms])
-        resources = await self.resource_repo.list_active()
-        nav = build_nav_tree(perms, resources, await self.nav_repo.combined_override_map(org.id, user.id))
+        current_roles, perms, nav = await self._session_access(org, user)
         access_token, expires_at = create_access_token(
             {"sub": str(user.id), "org": str(org.id), "org_code": org.org_code, "roles": current_roles, "perms": perms, "nav": nav}
         )
@@ -121,6 +118,21 @@ class AuthService:
         )
         await self.session.commit()
         return self._auth_response(access_token, new_refresh, expires_at, user, org, current_roles, perms, nav)
+
+    async def current_claims(self, org_id: int, user_id: int) -> dict:
+        org = await self.org_repo.get(org_id)
+        user = await self.user_repo.get_scoped(org_id, user_id)
+        if not org or not user:
+            raise AppError(401, "INVALID_SESSION", "Session user is no longer available")
+        current_roles, perms, nav = await self._session_access(org, user)
+        return {
+            "sub": str(user.id),
+            "org": str(org.id),
+            "org_code": org.org_code,
+            "roles": current_roles,
+            "perms": perms,
+            "nav": nav,
+        }
 
     async def logout(self, refresh_token: str, actor_user_id: int | None = None) -> None:
         stored = await self.token_repo.get_by_hash(hash_token(refresh_token))

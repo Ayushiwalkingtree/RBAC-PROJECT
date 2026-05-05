@@ -221,9 +221,7 @@ export const AppShell = ({ children }: PropsWithChildren) => {
   const canEditNavigation =
     Boolean(session) &&
     (can(RESOURCE_KEYS.resourceManageApi, PERMISSION_KEYS.update) ||
-      can(RESOURCE_KEYS.navOrderMenu, PERMISSION_KEYS.view) ||
-      (session?.org.code === 'PLATFORM' &&
-        session.user.roles.some((role) => role.toUpperCase().includes('SUPER ADMIN'))));
+      can(RESOURCE_KEYS.navOrderMenu, PERMISSION_KEYS.view));
 
   const activeParents = useMemo(() => {
     const active = new Set<string>();

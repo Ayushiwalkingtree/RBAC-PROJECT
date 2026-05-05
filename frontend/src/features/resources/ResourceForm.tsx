@@ -191,6 +191,11 @@ export const ResourceForm = ({
                   <TextField {...field} label="Parent resource key" fullWidth />
                 )} />
               </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Controller name="ui_path" control={control} render={({ field }) => (
+                  <TextField {...field} label="Route path" placeholder="/my-resource" fullWidth />
+                )} />
+              </Grid>
               <Grid size={{ xs: 12, md: 4 }}>
                 <Controller name="http_method" control={control} render={({ field }) => (
                   <TextField {...field} value={field.value ?? ''} select label="HTTP method" fullWidth>

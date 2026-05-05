@@ -27,6 +27,20 @@ export const createResourceKey = (
   return base;
 };
 
+const slugifyResourceName = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-|-$/gu, '');
+
+const defaultUiPath = (resourceName: string, resourceKey: string, resourceType: string): string => {
+  const slug = slugifyResourceName(resourceName) || resourceKey.toLowerCase();
+  if (resourceType === RESOURCE_TYPES.report) return `/reports/${slug}`;
+  if (resourceType === RESOURCE_TYPES.dashboard) return `/dashboard/${slug}`;
+  return `/${slug}`;
+};
+
 export const toPermissionDefinitions = (actions: string[]) =>
   actions.map((action) => ({
     key: action,
@@ -41,6 +55,7 @@ export const emptyResourceFormValues: ResourceFormValues = {
   description: '',
   sequence_no: undefined,
   parent_resource_key: '',
+  ui_path: '',
   http_method: '',
   api_path: '',
   microservice: '',
@@ -58,6 +73,7 @@ export const valuesFromResource = (resource: ResourceRecord): ResourceFormValues
   description: resource.description,
   sequence_no: resource.sequenceNo,
   parent_resource_key: resource.parentResourceKey ?? '',
+  ui_path: resource.uiPath ?? '',
   http_method: resource.httpMethod ?? '',
   api_path: resource.apiPath ?? '',
   microservice: resource.microservice ?? '',
@@ -72,10 +88,21 @@ export const normalizeResourceFormValues = (values: ResourceFormValues): Resourc
   const resourceKey =
     values.resource_key?.trim() ||
     createResourceKey(values.resource_group, values.resource_name, values.resource_type);
+  const navigableTypes = new Set<string>([
+    RESOURCE_TYPES.menu,
+    RESOURCE_TYPES.page,
+    RESOURCE_TYPES.dashboard,
+    RESOURCE_TYPES.report,
+  ]);
+  const isNavigable = navigableTypes.has(values.resource_type);
+  const uiPath = values.ui_path?.trim() || (values.is_ui_visible && isNavigable
+    ? defaultUiPath(values.resource_name, resourceKey, values.resource_type)
+    : '');
 
   return {
     ...values,
     resource_key: resourceKey,
+    ui_path: uiPath,
     description: values.description?.trim() || `${values.resource_name.trim()} access`,
     allowed_permissions: values.allowed_permissions.map((permission) => ({
       key: permission.key.toUpperCase(),

@@ -1,8 +1,10 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
 class ResourcePermissionPayload(BaseModel):
-    permissions: list[str]
+    permissions: list[Any]
 
 
 class ResourceCreate(BaseModel):
@@ -11,7 +13,7 @@ class ResourceCreate(BaseModel):
     resource_type: str
     resource_group: str
     description: str | None = None
-    allowed_permissions: list[str]
+    allowed_permissions: list[Any]
     http_method: str | None = None
     api_path: str | None = None
     microservice: str | None = None
@@ -28,7 +30,7 @@ class ResourceUpdate(ResourceCreate):
     resource_name: str | None = None
     resource_type: str | None = None
     resource_group: str | None = None
-    allowed_permissions: list[str] | None = None
+    allowed_permissions: list[Any] | None = None
     is_ui_visible: bool | None = None
     is_active: bool | None = None
 

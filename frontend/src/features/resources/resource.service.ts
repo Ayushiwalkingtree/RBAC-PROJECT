@@ -60,6 +60,7 @@ const toBackendPayload = (values: ResourceFormValues) => {
     ...normalized,
     allowed_permissions: normalized.allowed_permissions.map((permission) => permission.key),
     parent_resource_key: normalized.parent_resource_key || undefined,
+    ui_path: normalized.ui_path || undefined,
     http_method: normalized.http_method || undefined,
     api_path: normalized.api_path || undefined,
     microservice: normalized.microservice || undefined,

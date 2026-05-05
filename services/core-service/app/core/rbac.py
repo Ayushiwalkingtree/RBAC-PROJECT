@@ -2,18 +2,26 @@ from collections import defaultdict
 
 from app.core.errors import AppError
 
-NAV_TYPES = {"MENU", "DASHBOARD", "REPORT"}
+NAV_TYPES = {"MENU", "PAGE", "DASHBOARD", "REPORT"}
 
 
 def merge_permissions(role_permission_records: list[dict[str, list[str]]]) -> dict[str, list[str]]:
     merged: dict[str, set[str]] = defaultdict(set)
     for permissions_json in role_permission_records:
         for resource_key, permissions in permissions_json.items():
-            merged[resource_key].update(permission.upper() for permission in permissions)
+            merged[resource_key.upper()].update(permission.upper() for permission in permissions)
     return {resource_key: sorted(values) for resource_key, values in merged.items()}
 
 
-def build_nav_tree(merged_perms: dict[str, list[str]], resources: list[object], nav_overrides: dict[str, dict] | None = None) -> list[dict]:
+def has_view_grant(perms: dict[str, list[str]], resource_key: str) -> bool:
+    return "VIEW" in {permission.upper() for permission in perms.get(resource_key.upper(), [])}
+
+
+def build_nav_tree(
+    merged_perms: dict[str, list[str]],
+    resources: list[object],
+    nav_overrides: dict[str, dict] | None = None,
+) -> list[dict]:
     nav_overrides = nav_overrides or {}
     by_key = {getattr(resource, "resource_key"): resource for resource in resources}
     nav_candidates = {
@@ -36,7 +44,9 @@ def build_nav_tree(merged_perms: dict[str, list[str]], resources: list[object], 
 
     for resource in resources:
         resource_key = getattr(resource, "resource_key")
-        if resource_key not in nav_candidates or "VIEW" not in merged_perms.get(resource_key, []):
+        if resource_key not in nav_candidates:
+            continue
+        if not has_view_grant(merged_perms, resource_key):
             continue
         visible_keys.add(resource_key)
         parent_key = effective_parent_key(resource_key)
@@ -54,6 +64,8 @@ def build_nav_tree(merged_perms: dict[str, list[str]], resources: list[object], 
             "path": getattr(resource, "ui_path", None) or "/dashboard",
             "parent_resource_key": effective_parent_key(resource_key),
             "sequence_no": nav_overrides.get(resource_key, {}).get("sequence_no", getattr(resource, "sequence_no", None) or 9999),
+            "type": getattr(resource, "resource_type", "MENU"),
+            "icon": getattr(resource, "icon", None),
             "children": [],
         }
         for resource_key, resource in nav_candidates.items()
@@ -77,7 +89,7 @@ def build_nav_tree(merged_perms: dict[str, list[str]], resources: list[object], 
 
 def has_permission(perms: dict[str, list[str]], resource_key: str, permission_key: str) -> bool:
     permission = permission_key.upper()
-    values = set(perms.get(resource_key, []))
+    values = set(perms.get(resource_key.upper(), []))
     return permission in values or (permission == "VIEW" and "READ" in values) or (permission == "READ" and "VIEW" in values)
 
 

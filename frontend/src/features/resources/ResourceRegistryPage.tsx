@@ -42,6 +42,7 @@ import {
 import type { BusinessPermissionRow } from '@/shared/adapters/rbacDisplay.adapter';
 import type { ResourceFormValues } from '@/features/resources/resource.schema';
 import type { ResourceRecord } from '@/shared/types/rbac.types';
+import type { NavigationItem } from '@/shared/types/navigation.types';
 
 const navigableTypes = new Set<string>([
   RESOURCE_TYPES.menu,
@@ -56,6 +57,13 @@ const canManageResources = (
 ): boolean =>
   sessionOrgCode === 'PLATFORM' &&
   roles.some((role) => role.toUpperCase().replace(/[\s-]+/g, '_') === 'SUPER_ADMIN');
+
+const flattenNavigationKeys = (items: NavigationItem[]): Set<string> =>
+  items.reduce((keys, item) => {
+    keys.add(item.resourceKey);
+    flattenNavigationKeys(item.children ?? []).forEach((key) => keys.add(key));
+    return keys;
+  }, new Set<string>());
 
 type SortableNavigationRowProps = {
   resource: ResourceRecord;
@@ -136,17 +144,25 @@ export const ResourceRegistryPage = () => {
   const canCreateResource = can(RESOURCE_KEYS.resourceManageApi, PERMISSION_KEYS.create);
   const canUpdateResource = can(RESOURCE_KEYS.resourceManageApi, PERMISSION_KEYS.update);
   const canDeleteResource = can(RESOURCE_KEYS.resourceManageApi, PERMISSION_KEYS.delete);
-  const canManageNavigationOrder = isPlatformSuperAdmin && canUpdateResource;
+  const canManageNavigationOrder =
+    can(RESOURCE_KEYS.navOrderMenu, PERMISSION_KEYS.view) &&
+    can(RESOURCE_KEYS.navOrderApi, PERMISSION_KEYS.update);
   const isPlatform = session?.org.code === 'PLATFORM';
+  const visibleNavigationKeys = useMemo(
+    () => flattenNavigationKeys(session?.navigation ?? []),
+    [session?.navigation],
+  );
   const parentResources = resources.filter(
     (resource) => resource.resourceType === RESOURCE_TYPES.menu && resource.isActive,
   );
+  const visibleParentResources = parentResources.filter((resource) => visibleNavigationKeys.has(resource.resourceKey));
   const navResources = useMemo(
     () =>
       resources
         .filter((resource) => resource.isActive && resource.isUiVisible && navigableTypes.has(resource.resourceType))
+        .filter((resource) => visibleNavigationKeys.has(resource.resourceKey))
         .sort((current, next) => (current.sequenceNo ?? 9999) - (next.sequenceNo ?? 9999)),
-    [resources],
+    [resources, visibleNavigationKeys],
   );
   const businessRows = useMemo(() => buildBusinessPermissionRows(resources), [resources]);
   const technicalRows = useMemo(() => buildTechnicalPermissionRows(resources), [resources]);
@@ -342,7 +358,7 @@ export const ResourceRegistryPage = () => {
                   <SortableNavigationRow
                     key={resource.id}
                     resource={resource}
-                    parentOptions={parentResources}
+                    parentOptions={visibleParentResources}
                     onParentChange={handleParentChange}
                   />
                 ))}
