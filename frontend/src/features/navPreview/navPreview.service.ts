@@ -87,6 +87,7 @@ const fallbackIconForResourceKey = (resourceKey: string): string => {
   if (key.includes('ROLE') || key.includes('ADMIN')) return 'roles';
   if (key.includes('PERM')) return 'permissions';
   if (key.includes('RESOURCE')) return 'resources';
+  if (key.includes('COMPONENT')) return 'widgets';
   if (key.includes('REPORT') || key.includes('AUDIT')) return 'reports';
   if (key.includes('SETTING')) return 'settings';
   if (key.includes('TICKET')) return 'tickets';

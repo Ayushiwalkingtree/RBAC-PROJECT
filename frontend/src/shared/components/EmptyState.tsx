@@ -15,10 +15,23 @@ export const EmptyState = ({ title, description, children }: EmptyStateProps) =>
       borderColor: 'divider',
       p: 4,
       textAlign: 'center',
+      boxShadow: '0 1px 2px rgba(24, 36, 51, 0.04)',
     }}
   >
     <Stack spacing={2} alignItems="center">
-      <InboxIcon color="primary" />
+      <Stack
+        alignItems="center"
+        justifyContent="center"
+        sx={{
+          width: 44,
+          height: 44,
+          borderRadius: 1.5,
+          bgcolor: 'primary.light',
+          color: 'primary.main',
+        }}
+      >
+        <InboxIcon fontSize="small" />
+      </Stack>
       <Stack spacing={0.5}>
         <Typography variant="h6">{title}</Typography>
         <Typography variant="body2" color="text.secondary">

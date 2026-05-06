@@ -126,6 +126,7 @@ export const RESOURCE_KEYS = {
   orgSettings: 'ORG_SETTINGS',
   auditLogsMenu: 'AUDIT_LOG_MENU',
   auditLogApi: 'AUDIT_LOG_API',
+  componentsMenu: 'COMPONENTS_MENU',
   settingsMenu: 'SETTINGS_MENU',
   settingsManageApi: 'SETTINGS_MANAGE_API',
   navPreviewMenu: 'NAV_PREVIEW_MENU',

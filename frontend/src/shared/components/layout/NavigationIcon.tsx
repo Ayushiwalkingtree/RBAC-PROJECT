@@ -7,6 +7,7 @@ import KeyIcon from '@mui/icons-material/Key';
 import PreviewIcon from '@mui/icons-material/Preview';
 import SchemaIcon from '@mui/icons-material/Schema';
 import SettingsIcon from '@mui/icons-material/Settings';
+import WidgetsIcon from '@mui/icons-material/Widgets';
 import type { SvgIconComponent } from '@mui/icons-material';
 
 const ICONS: Record<string, SvgIconComponent> = {
@@ -19,6 +20,8 @@ const ICONS: Record<string, SvgIconComponent> = {
   settings: SettingsIcon,
   resources: SchemaIcon,
   preview: PreviewIcon,
+  widgets: WidgetsIcon,
+  components: WidgetsIcon,
 };
 
 type NavigationIconProps = {

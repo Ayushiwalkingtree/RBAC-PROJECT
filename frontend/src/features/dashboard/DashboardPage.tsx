@@ -51,13 +51,19 @@ export const DashboardPage = () => {
                 sx={{
                   border: 1,
                   borderColor: 'divider',
-                  transition: 'transform 160ms ease, box-shadow 160ms ease',
-                  '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 },
+                  boxShadow: '0 1px 2px rgba(24, 36, 51, 0.04)',
+                  '&:hover': { boxShadow: '0 4px 16px rgba(24, 36, 51, 0.08)' },
                 }}
               >
                 <CardContent>
                   <Stack direction="row" spacing={2} alignItems="center">
-                    <Icon color="primary" />
+                    <Stack
+                      alignItems="center"
+                      justifyContent="center"
+                      sx={{ width: 38, height: 38, borderRadius: 1, bgcolor: 'primary.light', color: 'primary.main' }}
+                    >
+                      <Icon fontSize="small" />
+                    </Stack>
                     <Stack>
                       <Typography variant="body2" color="text.secondary">
                         {metric.label}

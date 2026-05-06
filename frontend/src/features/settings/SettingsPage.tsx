@@ -1,17 +1,14 @@
 import SaveIcon from '@mui/icons-material/Save';
 import {
   Alert,
-  FormControl,
+  Box,
+  Chip,
   Grid,
-  InputLabel,
-  MenuItem,
   Paper,
-  Select,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
-import type { SelectChangeEvent } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { organizationService } from '@/features/settings/organization.service';
@@ -20,11 +17,82 @@ import { PageHeader } from '@/shared/components/PageHeader';
 import { useToast } from '@/shared/components/useToast';
 import { PermissionGuard } from '@/shared/components/guards/PermissionGuard';
 import { PERMISSION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
-import { THEME_OPTIONS } from '@/shared/theme/theme.constants';
+import { THEME_PRESETS } from '@/shared/theme/theme.constants';
 import { useThemeStore } from '@/shared/theme/theme.store';
 import type { RefreshTokenRecord, TenantSetting } from '@/shared/types/domain.types';
 import type { Organization } from '@/shared/types/auth.types';
-import type { ThemeMode } from '@/shared/types/theme.types';
+import type { ThemeMode, ThemePreset } from '@/shared/types/theme.types';
+
+const ThemePresetCard = ({
+  preset,
+  active,
+  onSelect,
+}: {
+  preset: ThemePreset;
+  active: boolean;
+  onSelect: (mode: ThemeMode) => void;
+}) => (
+  <Paper
+    component="button"
+    type="button"
+    elevation={0}
+    onClick={() => onSelect(preset.id)}
+    sx={{
+      border: 1,
+      borderColor: active ? preset.primary : 'divider',
+      bgcolor: 'background.paper',
+      color: 'text.primary',
+      p: 1.5,
+      minHeight: 92,
+      textAlign: 'left',
+      cursor: 'pointer',
+      boxShadow: active ? `0 0 0 3px ${preset.primary}22` : 'none',
+      transition: 'border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease',
+      '&:hover': {
+        borderColor: preset.primary,
+        boxShadow: `0 0 0 3px ${preset.primary}18`,
+      },
+    }}
+  >
+    <Stack spacing={1.25}>
+      <Stack direction="row" spacing={1.25} alignItems="center" justifyContent="space-between">
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Box
+            sx={{
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              bgcolor: preset.primary,
+              border: 3,
+              borderColor: preset.pageBg,
+              boxShadow: `0 0 0 1px ${preset.border}`,
+            }}
+          />
+          <Typography variant="subtitle2" fontWeight={800}>
+            {preset.label}
+          </Typography>
+        </Stack>
+        {active && (
+          <Chip
+            label="Active"
+            size="small"
+            sx={{
+              height: 22,
+              bgcolor: preset.primary,
+              color: '#ffffff',
+              fontSize: '0.68rem',
+            }}
+          />
+        )}
+      </Stack>
+      <Stack direction="row" spacing={0.75}>
+        <Box sx={{ height: 18, flex: 1, borderRadius: 0.75, bgcolor: preset.sidebar }} />
+        <Box sx={{ height: 18, flex: 1, borderRadius: 0.75, bgcolor: preset.pageBg, border: 1, borderColor: preset.border }} />
+        <Box sx={{ height: 18, flex: 1, borderRadius: 0.75, bgcolor: preset.cardBg, border: 1, borderColor: preset.border }} />
+      </Stack>
+    </Stack>
+  </Paper>
+);
 
 export const SettingsPage = () => {
   const session = useAuthStore((state) => state.session);
@@ -91,8 +159,10 @@ export const SettingsPage = () => {
     }
   };
 
-  const handleThemeChange = (event: SelectChangeEvent) => {
-    setMode(event.target.value as ThemeMode);
+  const handleThemeChange = (nextMode: ThemeMode) => {
+    setMode(nextMode);
+    const nextTheme = THEME_PRESETS.find((preset) => preset.id === nextMode);
+    showToast(`Theme changed to ${nextTheme?.label ?? 'theme'}`);
   };
 
   const handleOrgChange = (key: keyof Organization, value: string) => {
@@ -119,19 +189,25 @@ export const SettingsPage = () => {
 
       <Stack spacing={2}>
         <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Appearance
-          </Typography>
-          <FormControl size="small" sx={{ minWidth: 220 }}>
-            <InputLabel>Theme</InputLabel>
-            <Select label="Theme" value={mode} onChange={handleThemeChange}>
-              {THEME_OPTIONS.map((option) => (
-                <MenuItem key={option.id} value={option.id}>
-                  {option.label}
-                </MenuItem>
+          <Stack spacing={2}>
+            <Box>
+              <Typography variant="h6">Theme Presets</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Quick theme switches
+              </Typography>
+            </Box>
+            <Grid container spacing={1.5}>
+              {THEME_PRESETS.map((preset) => (
+                <Grid key={preset.id} size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+                  <ThemePresetCard
+                    preset={preset}
+                    active={mode === preset.id}
+                    onSelect={handleThemeChange}
+                  />
+                </Grid>
               ))}
-            </Select>
-          </FormControl>
+            </Grid>
+          </Stack>
         </Paper>
 
         <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2 }}>

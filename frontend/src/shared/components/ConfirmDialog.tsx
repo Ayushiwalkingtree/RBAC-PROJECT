@@ -24,7 +24,7 @@ export const ConfirmDialog = ({
   <AppDialog open={open} title={title} onClose={onCancel} maxWidth="xs">
     <Stack spacing={2}>
       <DialogContentText>{description}</DialogContentText>
-      <DialogActions sx={{ px: 0 }}>
+      <DialogActions sx={{ px: 0, pb: 0, gap: 1 }}>
         <AppButton variant="outlined" color="inherit" onClick={onCancel}>
           Cancel
         </AppButton>

@@ -41,20 +41,41 @@ export const VerifyEmailPage = () => {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', alignItems: 'center', py: 5 }}>
       <Container maxWidth="sm">
-        <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 3 }}>
-          <Stack spacing={2.5}>
-            <Box>
-              <Typography variant="h4" fontWeight={900}>Verify email</Typography>
-              {token ? (
-                <Typography variant="body2" color="text.secondary">
-                  Ready to verify your email.
-                </Typography>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  Invalid or missing verification link.
-                </Typography>
-              )}
+        <Stack spacing={2.5} alignItems="center">
+          <Stack spacing={1} alignItems="center" textAlign="center">
+            <Box
+              sx={{
+                width: 46,
+                height: 46,
+                borderRadius: 1.5,
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
+                display: 'grid',
+                placeItems: 'center',
+                fontWeight: 900,
+              }}
+            >
+              CI
             </Box>
+            <Box>
+              <Typography variant="h4">Verify email</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {token ? 'Ready to verify your email.' : 'Invalid or missing verification link.'}
+              </Typography>
+            </Box>
+          </Stack>
+          <Paper
+            elevation={0}
+            sx={{
+              width: '100%',
+              maxWidth: 420,
+              border: 1,
+              borderColor: 'divider',
+              p: 3,
+              boxShadow: '0 8px 24px rgba(24, 36, 51, 0.08)',
+            }}
+          >
+            <Stack spacing={2.5}>
             {import.meta.env.DEV && (
               <Alert severity="info">
                 In development, signup and user-create responses can show an Open verification link button.
@@ -85,7 +106,8 @@ export const VerifyEmailPage = () => {
               )}
             </Stack>
           </Stack>
-        </Paper>
+          </Paper>
+        </Stack>
       </Container>
     </Box>
   );

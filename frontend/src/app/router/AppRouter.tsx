@@ -4,6 +4,7 @@ import { LoginPage } from '@/features/auth/components/LoginPage';
 import { SignupPage } from '@/features/auth/components/SignupPage';
 import { VerifyEmailPage } from '@/features/auth/components/VerifyEmailPage';
 import { AuditLogsPage } from '@/features/audit/AuditLogsPage';
+import { ComponentLibraryPage } from '@/features/components/ComponentLibraryPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { PermissionsMatrixPage } from '@/features/permissions/PermissionsMatrixPage';
 import { ReportsPage } from '@/features/reports/ReportsPage';
@@ -76,6 +77,7 @@ export const AppRouter = () => (
           <Route path={ROUTES.reports} element={protectedElement(ROUTES.reports, <ReportsPage />)} />
           <Route path={ROUTES.auditLogs} element={protectedElement(ROUTES.auditLogs, <AuditLogsPage />)} />
           <Route path={ROUTES.settings} element={protectedElement(ROUTES.settings, <SettingsPage />)} />
+          <Route path={ROUTES.components} element={protectedElement(ROUTES.components, <ComponentLibraryPage />)} />
           <Route
             path={ROUTES.resourceRegistry}
             element={protectedElement(ROUTES.resourceRegistry, <ResourceRegistryPage />)}

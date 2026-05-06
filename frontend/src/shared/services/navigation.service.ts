@@ -25,6 +25,7 @@ export const pathForResource = (resource: ResourceRecord): string => {
   if (key.includes('ROLE') || key === 'ADMIN_MENU') return '/roles';
   if (key.includes('PERM')) return '/permissions';
   if (key.includes('RESOURCE')) return '/resource-registry';
+  if (key.includes('COMPONENT')) return '/components';
   if (key.includes('TENANT_ADMIN_ACCESS')) return '/tenant-admin-access';
   if (key.includes('AUDIT')) return '/audit-logs';
   if (key.includes('NAV_PREVIEW')) return '/nav-preview';
@@ -41,6 +42,7 @@ const fallbackIconForResource = (resource: ResourceRecord): string => {
   if (key.includes('ROLE') || key === 'ADMIN_MENU') return 'roles';
   if (key.includes('PERM')) return 'permissions';
   if (key.includes('RESOURCE')) return 'resources';
+  if (key.includes('COMPONENT')) return 'widgets';
   if (key.includes('AUDIT')) return 'reports';
   if (key.includes('REPORT')) return 'reports';
   if (key.includes('LOAN') || key.includes('TICKET')) return 'tickets';

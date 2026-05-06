@@ -82,28 +82,45 @@ export const LoginPage = () => {
         bgcolor: 'background.default',
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'center',
         py: 5,
       }}
     >
-      <Container maxWidth="lg">
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="stretch">
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <Typography variant="h3" fontWeight={800} sx={{ mb: 2 }}>
-              {APP_CONFIG.name}
-            </Typography>
-            <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 560 }}>
-              Multi-tenant access control with tenant-scoped identities and permission-first UI.
-            </Typography>
-          </Box>
+      <Container maxWidth="sm">
+        <Stack spacing={2.5} alignItems="center">
+          <Stack spacing={1} alignItems="center" textAlign="center">
+            <Box
+              sx={{
+                width: 46,
+                height: 46,
+                borderRadius: 1.5,
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
+                display: 'grid',
+                placeItems: 'center',
+                fontWeight: 900,
+              }}
+            >
+              CI
+            </Box>
+            <Box>
+              <Typography variant="h4">Welcome back</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Sign in to {APP_CONFIG.name}
+              </Typography>
+            </Box>
+          </Stack>
           <Paper
             component="form"
             onSubmit={onSubmit}
             elevation={0}
             sx={{
-              width: { xs: '100%', md: 420 },
+              width: '100%',
+              maxWidth: 400,
               p: 3,
               border: 1,
               borderColor: 'divider',
+              boxShadow: '0 8px 24px rgba(24, 36, 51, 0.08)',
             }}
           >
             <Stack spacing={2.5}>
@@ -204,7 +221,7 @@ export const LoginPage = () => {
                   />
                 )}
               />
-              <Button type="submit" startIcon={<LoginIcon />} disabled={isLoading} size="large">
+              <Button type="submit" startIcon={<LoginIcon />} disabled={isLoading} size="large" fullWidth>
                 {isLoading ? 'Signing in...' : 'Sign in'}
               </Button>
               <Link component={RouterLink} to={ROUTES.signup} textAlign="center">

@@ -74,14 +74,48 @@ export const SignupPage = () => {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', alignItems: 'center', py: 5 }}>
       <Container maxWidth="md">
-        <Paper component="form" onSubmit={onSubmit} elevation={0} sx={{ border: 1, borderColor: 'divider', p: 3 }}>
-          <Stack spacing={2.5}>
+        <Stack spacing={2.5} alignItems="center">
+          <Stack spacing={1} alignItems="center" textAlign="center">
+            <Box
+              sx={{
+                width: 46,
+                height: 46,
+                borderRadius: 1.5,
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
+                display: 'grid',
+                placeItems: 'center',
+                fontWeight: 900,
+              }}
+            >
+              CI
+            </Box>
             <Box>
-              <Typography variant="h4" fontWeight={900}>Create organization</Typography>
+              <Typography variant="h4">Create organization</Typography>
               <Typography variant="body2" color="text.secondary">
-                The first user becomes the verified organization admin after email verification.
+                Set up a tenant and verify the first administrator.
               </Typography>
             </Box>
+          </Stack>
+          <Paper
+            component="form"
+            onSubmit={onSubmit}
+            elevation={0}
+            sx={{
+              width: '100%',
+              border: 1,
+              borderColor: 'divider',
+              p: 3,
+              boxShadow: '0 8px 24px rgba(24, 36, 51, 0.08)',
+            }}
+          >
+            <Stack spacing={2.5}>
+              <Box>
+                <Typography variant="h5">Organization details</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  The first user becomes the verified organization admin after email verification.
+                </Typography>
+              </Box>
             <Alert severity="info">Organization codes are global; emails are unique only inside an organization.</Alert>
             {successMessage && (
               <Alert
@@ -164,7 +198,8 @@ export const SignupPage = () => {
               <Button type="submit" size="large" startIcon={<HowToRegIcon />}>Create and verify</Button>
             </Stack>
           </Stack>
-        </Paper>
+          </Paper>
+        </Stack>
       </Container>
     </Box>
   );

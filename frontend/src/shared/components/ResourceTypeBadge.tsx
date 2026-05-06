@@ -16,5 +16,17 @@ type ResourceTypeBadgeProps = {
 };
 
 export const ResourceTypeBadge = ({ type }: ResourceTypeBadgeProps) => (
-  <Chip label={type} size="small" color={colorByType[type] ?? 'default'} sx={{ fontWeight: 800 }} />
+  <Chip
+    label={type}
+    size="small"
+    color={colorByType[type] ?? 'default'}
+    variant="outlined"
+    sx={{
+      height: 24,
+      borderRadius: 999,
+      fontSize: '0.7rem',
+      fontWeight: 800,
+      bgcolor: 'background.paper',
+    }}
+  />
 );

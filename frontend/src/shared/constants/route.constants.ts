@@ -12,6 +12,7 @@ export const ROUTES = {
   reports: '/reports',
   auditLogs: '/audit-logs',
   settings: '/settings',
+  components: '/components',
   resourceRegistry: '/resource-registry',
   tenantAdminAccess: '/tenant-admin-access',
   navPreview: '/nav-preview',
@@ -27,6 +28,7 @@ export const ROUTE_PERMISSIONS = {
   [ROUTES.reports]: { resource: RESOURCE_KEYS.reportsMenu, permission: PERMISSION_KEYS.view },
   [ROUTES.auditLogs]: { resource: RESOURCE_KEYS.auditLogApi, permission: PERMISSION_KEYS.read },
   [ROUTES.settings]: { resource: RESOURCE_KEYS.settingsMenu, permission: PERMISSION_KEYS.view },
+  [ROUTES.components]: { resource: RESOURCE_KEYS.componentsMenu, permission: PERMISSION_KEYS.view },
   [ROUTES.resourceRegistry]: {
     resource: RESOURCE_KEYS.resourceRegistryMenu,
     permission: PERMISSION_KEYS.view,

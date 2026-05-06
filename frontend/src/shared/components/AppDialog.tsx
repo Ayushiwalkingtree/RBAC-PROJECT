@@ -35,15 +35,17 @@ export const AppDialog = ({
     TransitionComponent={Fade}
     PaperProps={{
       sx: {
-        borderRadius: 3,
+        borderRadius: 2,
+        border: 1,
+        borderColor: 'divider',
         overflow: 'hidden',
       },
     }}
   >
-    <DialogTitle sx={{ pb: 1 }}>
+    <DialogTitle sx={{ pb: 1.25 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
         <Stack spacing={0.5}>
-          <Typography variant="h6">{title}</Typography>
+          <Typography variant="h6" sx={{ color: 'text.primary' }}>{title}</Typography>
           {helperText && (
             <Typography variant="body2" color="text.secondary">
               {helperText}
@@ -55,6 +57,6 @@ export const AppDialog = ({
         </IconButton>
       </Stack>
     </DialogTitle>
-    <DialogContent sx={{ pt: 2 }}>{children}</DialogContent>
+    <DialogContent sx={{ pt: 2.25 }}>{children}</DialogContent>
   </Dialog>
 );
