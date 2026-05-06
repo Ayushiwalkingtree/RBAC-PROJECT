@@ -35,8 +35,8 @@ async def rbac_check(
         await _cache_set(cache_key, "0")
         return api_response(request, RbacCheckResponse(allowed=False, reason="USER_NOT_FOUND_OR_INACTIVE").model_dump())
 
-    role_ids = await UserRepository(session).role_ids_for_user(payload.user_id)
-    role_perms = await RoleRepository(session).permissions_for_roles(role_ids)
+    role_ids = await UserRepository(session).role_ids_for_user(payload.user_id, payload.org_id)
+    role_perms = await RoleRepository(session).permissions_for_roles(role_ids, payload.org_id)
     perms = merge_permissions([permission.permissions_json for permission in role_perms])
     allowed = has_permission(perms, payload.resource_key, payload.permission or "")
     await _cache_set(cache_key, "1" if allowed else "0")

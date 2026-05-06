@@ -59,35 +59,62 @@ async def resolve_navigation_order_user(user_id: int, session: DbSession, claims
 async def list_users(request: Request, session: DbSession, claims: CurrentClaims):
     repo = UserRepository(session)
     org_id = get_current_org_id(claims)
-    users = await repo.list_scoped(org_id)
-    roles = await RoleRepository(session).list_scoped(org_id)
+    actor_user_id = get_current_user_id(claims)
+    users = await repo.list_visible_for_actor(org_id, actor_user_id)
+    all_roles = await RoleRepository(session).list_scoped(org_id)
+    is_super_admin = is_platform_super_admin(str(claims.get("org_code", "")), list(claims.get("roles", [])))
+    if is_super_admin:
+        admin_role_ids = {
+            role.id
+            for role in all_roles
+            if role.role_code != "SUPER_ADMIN" and "ADMIN" in role.role_code
+        }
+        admin_users = []
+        for user in users:
+            role_ids = await repo.role_ids_for_user(user.id, org_id)
+            if admin_role_ids.intersection(set(role_ids)):
+                admin_users.append(user)
+        users = admin_users
+    roles = (
+        await RoleRepository(session).list_platform_admin_roles(org_id)
+        if is_super_admin
+        else await RoleRepository(session).list_visible_for_actor(org_id, actor_user_id)
+    )
     role_by_id = {role.id: role.role_code for role in roles}
     rows = []
     for user in users:
-        role_ids = await repo.role_ids_for_user(user.id)
+        role_ids = await repo.role_ids_for_user(user.id, org_id)
         rows.append(serialize_user(user, role_ids, [role_by_id[role_id] for role_id in role_ids if role_id in role_by_id]))
     return api_response(request, rows)
 
 
 @router.post("", dependencies=[Depends(require_permission("USER_CREATE_API", "EXECUTE"))])
 async def create_user(payload: UserCreate, request: Request, session: DbSession, claims: CurrentClaims):
-    user, dev_url = await UserService(session).create(get_current_org_id(claims), payload, get_current_user_id(claims))
+    user, dev_url = await UserService(session).create(
+        get_current_org_id(claims),
+        payload,
+        get_current_user_id(claims),
+        allow_platform_admin_roles=is_platform_super_admin(str(claims.get("org_code", "")), list(claims.get("roles", []))),
+    )
     return api_response(request, {"user": serialize_user(user, payload.role_ids), "dev_verification_url": dev_url})
 
 
 @router.get("/{user_id}", dependencies=[Depends(require_permission("USER_LIST_API", "READ"))])
 async def get_user(user_id: int, request: Request, session: DbSession, claims: CurrentClaims):
     repo = UserRepository(session)
-    user = await repo.get_scoped(get_current_org_id(claims), user_id)
+    user = await repo.get_visible_for_actor(get_current_org_id(claims), user_id, get_current_user_id(claims))
     if not user:
         from app.core.errors import AppError
 
         raise AppError(404, "USER_NOT_FOUND", "User was not found")
-    return api_response(request, serialize_user(user, await repo.role_ids_for_user(user.id)))
+    return api_response(request, serialize_user(user, await repo.role_ids_for_user(user.id, get_current_org_id(claims))))
 
 
 @router.get("/{user_id}/effective-access", dependencies=[Depends(require_permission("USER_LIST_API", "READ"))])
 async def get_user_effective_access(user_id: int, request: Request, session: DbSession, claims: CurrentClaims):
+    user = await UserRepository(session).get_visible_for_actor(get_current_org_id(claims), user_id, get_current_user_id(claims))
+    if not user:
+        raise AppError(404, "USER_NOT_FOUND", "User was not found")
     access = await EffectiveAccessService(session).for_user(get_current_org_id(claims), user_id)
     return api_response(request, access)
 
@@ -121,7 +148,7 @@ async def update_user_navigation_order(
 @router.put("/{user_id}", dependencies=[Depends(require_permission("USER_UPDATE_API", "EXECUTE"))])
 async def update_user(user_id: int, payload: UserUpdate, request: Request, session: DbSession, claims: CurrentClaims):
     user = await UserService(session).update(get_current_org_id(claims), user_id, payload, get_current_user_id(claims))
-    return api_response(request, serialize_user(user, await UserRepository(session).role_ids_for_user(user.id)))
+    return api_response(request, serialize_user(user, await UserRepository(session).role_ids_for_user(user.id, get_current_org_id(claims))))
 
 
 @router.delete("/{user_id}", dependencies=[Depends(require_permission("USER_DELETE_API", "EXECUTE"))])
@@ -133,17 +160,23 @@ async def delete_user(user_id: int, request: Request, session: DbSession, claims
 @router.post("/{user_id}/roles", dependencies=[Depends(require_permission("USER_UPDATE_API", "EXECUTE"))])
 async def replace_user_roles(user_id: int, payload: UserRolesUpdate, request: Request, session: DbSession, claims: CurrentClaims):
     org_id = get_current_org_id(claims)
-    user = await UserRepository(session).get_scoped(org_id, user_id)
+    user = await UserRepository(session).get_visible_for_actor(org_id, user_id, get_current_user_id(claims))
     if not user:
         from app.core.errors import AppError
 
         raise AppError(404, "USER_NOT_FOUND", "User was not found")
     for role_id in payload.role_ids:
-        if not await RoleRepository(session).get_scoped(org_id, role_id):
+        role_repo = RoleRepository(session)
+        role = await role_repo.get_visible_for_actor(org_id, role_id, get_current_user_id(claims))
+        if not role and is_platform_super_admin(str(claims.get("org_code", "")), list(claims.get("roles", []))):
+            role = await role_repo.get_platform_admin_role(org_id, role_id)
+        if not role:
             from app.core.errors import AppError
 
             raise AppError(404, "ROLE_NOT_FOUND", "Role was not found")
-    existing_result = await session.execute(select(UserRole).where(UserRole.user_id == user_id))
+    existing_result = await session.execute(
+        select(UserRole).where(UserRole.user_id == user_id, UserRole.at_organization_id == org_id)
+    )
     existing_roles = list(existing_result.scalars())
     for existing in existing_roles:
         existing.is_deleted = True
@@ -153,6 +186,7 @@ async def replace_user_roles(user_id: int, payload: UserRolesUpdate, request: Re
             existing.is_deleted = False
             existing.assigned_at = existing.assigned_at or utcnow()
             existing.assigned_by = get_current_user_id(claims)
+            existing.created_by = existing.created_by or get_current_user_id(claims)
         else:
             session.add(
                 UserRole(
@@ -161,6 +195,7 @@ async def replace_user_roles(user_id: int, payload: UserRolesUpdate, request: Re
                     at_organization_id=org_id,
                     assigned_at=utcnow(),
                     assigned_by=get_current_user_id(claims),
+                    created_by=get_current_user_id(claims),
                 )
             )
     await AuditService(session).write(org_id, "ROLE_ASSIGNED", "USER_ROLE", "User roles replaced", actor_user_id=get_current_user_id(claims), target_user_id=user_id)
@@ -171,13 +206,17 @@ async def replace_user_roles(user_id: int, payload: UserRolesUpdate, request: Re
 @router.delete("/{user_id}/roles/{role_id}", dependencies=[Depends(require_permission("USER_UPDATE_API", "EXECUTE"))])
 async def remove_user_role(user_id: int, role_id: int, request: Request, session: DbSession, claims: CurrentClaims):
     org_id = get_current_org_id(claims)
-    user = await UserRepository(session).get_scoped(org_id, user_id)
+    user = await UserRepository(session).get_visible_for_actor(org_id, user_id, get_current_user_id(claims))
     if not user:
         from app.core.errors import AppError
 
         raise AppError(404, "USER_NOT_FOUND", "User was not found")
     active_result = await session.execute(
-        select(UserRole).where(UserRole.user_id == user_id, UserRole.is_deleted.is_(False))
+        select(UserRole).where(
+            UserRole.user_id == user_id,
+            UserRole.at_organization_id == org_id,
+            UserRole.is_deleted.is_(False),
+        )
     )
     active_roles = list(active_result.scalars())
     if len(active_roles) <= 1:

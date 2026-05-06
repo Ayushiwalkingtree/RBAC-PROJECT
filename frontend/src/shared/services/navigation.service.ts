@@ -26,6 +26,10 @@ export const pathForResource = (resource: ResourceRecord): string => {
   if (key.includes('PERM')) return '/permissions';
   if (key.includes('RESOURCE')) return '/resource-registry';
   if (key.includes('COMPONENT')) return '/components';
+  if (key === 'WORKFLOW_START_MENU') return '/workflow/start';
+  if (key === 'WORKFLOW_TASKS_MENU') return '/workflow/tasks';
+  if (key === 'WORKFLOW_INSTANCES_MENU') return '/workflow/instances';
+  if (key.includes('WORKFLOW')) return '/workflow/tasks';
   if (key.includes('TENANT_ADMIN_ACCESS')) return '/tenant-admin-access';
   if (key.includes('AUDIT')) return '/audit-logs';
   if (key.includes('NAV_PREVIEW')) return '/nav-preview';
@@ -43,6 +47,7 @@ const fallbackIconForResource = (resource: ResourceRecord): string => {
   if (key.includes('PERM')) return 'permissions';
   if (key.includes('RESOURCE')) return 'resources';
   if (key.includes('COMPONENT')) return 'widgets';
+  if (key.includes('WORKFLOW')) return 'workflow';
   if (key.includes('AUDIT')) return 'reports';
   if (key.includes('REPORT')) return 'reports';
   if (key.includes('LOAN') || key.includes('TICKET')) return 'tickets';

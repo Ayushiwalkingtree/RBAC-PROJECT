@@ -5,6 +5,8 @@ import pytest
 
 from app.core.rbac import build_nav_tree, has_permission, is_platform_super_admin, merge_permissions
 from app.api.v1.endpoints import permissions as permissions_endpoint
+from app.api.v1.endpoints import roles as roles_endpoint
+from app.api.v1.endpoints import users as users_endpoint
 from app.services.permission_service import PermissionService
 from app.services.resource_service import normalized_available_permission_keys
 
@@ -292,6 +294,11 @@ async def test_tenant_access_matrix_falls_back_to_view_for_empty_dynamic_menu_pe
 async def test_super_admin_permission_matrix_endpoint_uses_dynamic_available_permission_keys(monkeypatch) -> None:
     CapturingPermissionService.calls = []
     monkeypatch.setattr(permissions_endpoint, "PermissionService", CapturingPermissionService)
+    role_repo = SimpleNamespace(
+        get_platform_admin_role=AsyncMock(return_value=SimpleNamespace(id=1, role_code="ORG_ADMIN")),
+        get_visible_for_actor=AsyncMock(return_value=None),
+    )
+    monkeypatch.setattr(permissions_endpoint, "RoleRepository", lambda _session: role_repo)
 
     request = SimpleNamespace(state=SimpleNamespace(request_id="test-request"))
     response = await permissions_endpoint.get_permissions(
@@ -316,6 +323,11 @@ async def test_super_admin_permission_matrix_endpoint_uses_dynamic_available_per
 async def test_org_admin_permission_matrix_endpoint_keeps_permission_boundary(monkeypatch) -> None:
     CapturingPermissionService.calls = []
     monkeypatch.setattr(permissions_endpoint, "PermissionService", CapturingPermissionService)
+    role_repo = SimpleNamespace(
+        get_platform_admin_role=AsyncMock(return_value=None),
+        get_visible_for_actor=AsyncMock(return_value=SimpleNamespace(id=1, role_code="ORG_ADMIN")),
+    )
+    monkeypatch.setattr(permissions_endpoint, "RoleRepository", lambda _session: role_repo)
 
     request = SimpleNamespace(state=SimpleNamespace(request_id="test-request"))
     await permissions_endpoint.get_permissions(
@@ -333,6 +345,44 @@ async def test_org_admin_permission_matrix_endpoint_keeps_permission_boundary(mo
 
     assert CapturingPermissionService.calls[0]["include_all_resources"] is False
     assert CapturingPermissionService.calls[0]["include_all_permission_keys"] is False
+
+
+@pytest.mark.asyncio
+async def test_normal_roles_endpoint_uses_creator_scope(monkeypatch) -> None:
+    role_repo = SimpleNamespace(
+        list_visible_for_actor=AsyncMock(return_value=[]),
+        list_platform_admin_roles=AsyncMock(return_value=[]),
+    )
+    monkeypatch.setattr(roles_endpoint, "RoleRepository", lambda _session: role_repo)
+
+    request = SimpleNamespace(state=SimpleNamespace(request_id="test-request"))
+    response = await roles_endpoint.list_roles(request, object(), {"org": 42, "sub": 7})
+
+    assert response["success"] is True
+    role_repo.list_visible_for_actor.assert_awaited_once_with(42, 7)
+
+
+@pytest.mark.asyncio
+async def test_normal_users_endpoint_uses_creator_scope(monkeypatch) -> None:
+    user_repo = SimpleNamespace(
+        list_visible_for_actor=AsyncMock(return_value=[]),
+        role_ids_for_user=AsyncMock(return_value=[]),
+    )
+    role_repo = SimpleNamespace(
+        list_scoped=AsyncMock(return_value=[]),
+        list_visible_for_actor=AsyncMock(return_value=[]),
+        list_platform_admin_roles=AsyncMock(return_value=[]),
+    )
+    monkeypatch.setattr(users_endpoint, "UserRepository", lambda _session: user_repo)
+    monkeypatch.setattr(users_endpoint, "RoleRepository", lambda _session: role_repo)
+
+    request = SimpleNamespace(state=SimpleNamespace(request_id="test-request"))
+    response = await users_endpoint.list_users(request, object(), {"org": 42, "sub": 7})
+
+    assert response["success"] is True
+    user_repo.list_visible_for_actor.assert_awaited_once_with(42, 7)
+    role_repo.list_scoped.assert_awaited_once_with(42)
+    role_repo.list_visible_for_actor.assert_awaited_once_with(42, 7)
 
 
 def test_super_admin_reserved_for_platform() -> None:

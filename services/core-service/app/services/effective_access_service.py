@@ -24,10 +24,10 @@ class EffectiveAccessService:
         if not org or not user:
             raise AppError(404, "USER_NOT_FOUND", "User was not found")
 
-        role_ids = await self.user_repo.role_ids_for_user(user.id)
+        role_ids = await self.user_repo.role_ids_for_user(user.id, org.id)
         all_roles = await self.role_repo.list_scoped(org.id)
         roles = [role for role in all_roles if role.id in role_ids]
-        role_perms = await self.role_repo.permissions_for_roles(role_ids)
+        role_perms = await self.role_repo.permissions_for_roles(role_ids, org.id)
         permissions = merge_permissions([permission.permissions_json for permission in role_perms])
         resources = await self.resource_repo.list_active()
         nav = build_nav_tree(permissions, resources, await self.nav_repo.combined_override_map(org.id, user.id))

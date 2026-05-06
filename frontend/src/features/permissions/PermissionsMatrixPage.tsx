@@ -16,6 +16,7 @@ import {
   buildBusinessPermissionRows,
   getTechnicalSummary,
   isBusinessActionSelected,
+  normalizePermissionMatrixDependencies,
 } from '@/shared/adapters/rbacDisplay.adapter';
 import type { BusinessPermissionAction } from '@/shared/adapters/rbacDisplay.adapter';
 import type { ResourceRecord, Role, RolePermissionGrants } from '@/shared/types/rbac.types';
@@ -37,6 +38,7 @@ export const PermissionsMatrixPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
 
+  const canReadMatrix = can(RESOURCE_KEYS.permissionGrantApi, PERMISSION_KEYS.read);
   const canConfigure = can(RESOURCE_KEYS.permissionGrantApi, PERMISSION_KEYS.configure);
   const selectedRole = roles.find((role) => role.id === selectedRoleId);
 
@@ -50,8 +52,8 @@ export const PermissionsMatrixPage = () => {
     [displayRows],
   );
 
-  const loadMatrix = async () => {
-    if (!session) return;
+  const loadMatrix = async (preferredRoleId = selectedRoleId) => {
+    if (!session || !canReadMatrix) return;
 
     setIsLoading(true);
     setLoadError('');
@@ -59,10 +61,11 @@ export const PermissionsMatrixPage = () => {
       const matrix = await permissionService.getRolePermissionsMatrix(session.org.id);
       setRoles(matrix.roles);
       setResources(matrix.resources);
-      const nextRoleId = selectedRoleId || matrix.roles[0]?.id || '';
+      const currentRoleStillVisible = matrix.roles.some((role) => role.id === preferredRoleId);
+      const nextRoleId = currentRoleStillVisible ? preferredRoleId : matrix.roles[0]?.id || '';
       setSelectedRoleId(nextRoleId);
       const role = matrix.roles.find((candidate) => candidate.id === nextRoleId);
-      setDraftPermissions(role?.permissions ?? {});
+      setDraftPermissions(normalizePermissionMatrixDependencies(role?.permissions ?? {}));
       setIsDirty(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to load permission matrix.';
@@ -74,13 +77,19 @@ export const PermissionsMatrixPage = () => {
   };
 
   useEffect(() => {
-    void loadMatrix();
+    if (!canReadMatrix) return;
+    setRoles([]);
+    setResources([]);
+    setSelectedRoleId('');
+    setDraftPermissions({});
+    setIsDirty(false);
+    void loadMatrix('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.org.id]);
+  }, [session?.org.id, canReadMatrix]);
 
   const selectRole = (role: Role) => {
     setSelectedRoleId(role.id);
-    setDraftPermissions(role.permissions);
+    setDraftPermissions(normalizePermissionMatrixDependencies(role.permissions));
     setIsDirty(false);
   };
 
@@ -92,26 +101,26 @@ export const PermissionsMatrixPage = () => {
   };
 
   const discardChanges = () => {
-    setDraftPermissions(selectedRole?.permissions ?? {});
+    setDraftPermissions(normalizePermissionMatrixDependencies(selectedRole?.permissions ?? {}));
     setIsDirty(false);
   };
 
   const handleSave = async () => {
-    if (!selectedRoleId) return;
+    if (!selectedRoleId || !canConfigure) return;
 
     setIsSaving(true);
     try {
       const affectsCurrentSession = Boolean(
         selectedRole?.code && session?.user.roles.includes(selectedRole.code),
       );
-      await permissionService.updateRolePermissions(selectedRoleId, draftPermissions, {
+      await permissionService.updateRolePermissions(selectedRoleId, normalizePermissionMatrixDependencies(draftPermissions), {
         userId: session?.user.id,
         email: session?.user.email,
       });
       if (affectsCurrentSession) {
         await refreshSession();
       }
-      await loadMatrix();
+      await loadMatrix(selectedRoleId);
       showToast(
         affectsCurrentSession
           ? 'Permissions updated. Navigation refreshed.'
@@ -126,15 +135,26 @@ export const PermissionsMatrixPage = () => {
 
   return (
     <>
+      {!canReadMatrix ? (
+        <EmptyState title="Unauthorized" description="You do not have permission to view this page." />
+      ) : (
+        <>
       <PageHeader title="Permission Matrix" subtitle="Grant each role permissions on registered resources.">
         <Stack direction="row" spacing={1}>
+          {import.meta.env.DEV && session && (
+            <Chip label={`Org ${session.org.id} / ${session.org.code}`} size="small" variant="outlined" />
+          )}
           {isDirty && <Chip color="warning" label="Unsaved changes" />}
           <AppButton variant="outlined" startIcon={<RestartAltIcon />} disabled={!isDirty} onClick={discardChanges}>
             Discard
           </AppButton>
-          <AppButton startIcon={<SaveIcon />} loading={isSaving} disabled={!canConfigure || !isDirty} onClick={() => void handleSave()}>
-            Save
-          </AppButton>
+          <Tooltip title={!canConfigure ? "You don't have permission to configure permissions" : ''}>
+            <span>
+              <AppButton startIcon={<SaveIcon />} loading={isSaving} disabled={!canConfigure || !isDirty} onClick={() => void handleSave()}>
+                Save
+              </AppButton>
+            </span>
+          </Tooltip>
         </Stack>
       </PageHeader>
 
@@ -206,12 +226,22 @@ export const PermissionsMatrixPage = () => {
                           </Box>
                           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                             {row.actions.map((permission) => (
-                              <PermissionChip
+                              <Tooltip
                                 key={permission.id}
-                                label={permission.label}
-                                selected={isBusinessActionSelected(draftPermissions, permission)}
-                                onClick={() => toggleGrant(permission)}
-                              />
+                                title={!canConfigure ? "You don't have permission to configure permissions" : ''}
+                              >
+                                <span>
+                                  <PermissionChip
+                                    label={permission.label}
+                                    selected={isBusinessActionSelected(draftPermissions, permission)}
+                                    disabled={!canConfigure}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      toggleGrant(permission);
+                                    }}
+                                  />
+                                </span>
+                              </Tooltip>
                             ))}
                           </Stack>
                         </Stack>
@@ -224,6 +254,8 @@ export const PermissionsMatrixPage = () => {
           )}
         </Paper>
       </Box>
+        </>
+      )}
     </>
   );
 };

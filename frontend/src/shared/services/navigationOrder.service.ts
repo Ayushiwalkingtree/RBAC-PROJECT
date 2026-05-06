@@ -23,17 +23,28 @@ const fallbackIconForResourceKey = (resourceKey: string): string => {
   if (key.includes('ROLE') || key.includes('ADMIN')) return 'roles';
   if (key.includes('PERM')) return 'permissions';
   if (key.includes('RESOURCE')) return 'resources';
+  if (key.includes('COMPONENT')) return 'widgets';
+  if (key.includes('WORKFLOW')) return 'workflow';
   if (key.includes('REPORT') || key.includes('AUDIT')) return 'reports';
   if (key.includes('SETTING')) return 'settings';
   if (key.includes('TICKET')) return 'tickets';
   return 'dashboard';
 };
 
+const fallbackPathForResourceKey = (resourceKey: string): string => {
+  const key = resourceKey.toUpperCase();
+  if (key === 'WORKFLOW_START_MENU') return '/workflow/start';
+  if (key === 'WORKFLOW_TASKS_MENU') return '/workflow/tasks';
+  if (key === 'WORKFLOW_INSTANCES_MENU') return '/workflow/instances';
+  if (key.includes('WORKFLOW')) return '/workflow/tasks';
+  return '/dashboard';
+};
+
 const mapBackendNavigation = (items: BackendNavigationItem[]): NavigationItem[] =>
   items.map((item) => ({
     id: String(item.id),
     label: item.label,
-    path: item.path || '/dashboard',
+    path: item.path || fallbackPathForResourceKey(item.resource_key),
     icon: item.icon ?? fallbackIconForResourceKey(item.resource_key),
     type: (item.type ?? 'MENU') as NavigationItem['type'],
     sequenceNo: item.sequence_no ?? 9999,

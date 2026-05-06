@@ -1,19 +1,18 @@
 from fastapi import APIRouter, Request
 
+from app.api.v1.endpoints.roles import serialize_role
 from app.dependencies.auth import CurrentClaims, require_platform_super_admin
 from app.dependencies.db import DbSession
 from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.role_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
-from app.api.v1.endpoints.roles import serialize_role
-from app.services.effective_access_service import EffectiveAccessService
 from app.utils.response import api_response
 
-router = APIRouter(prefix="/platform/organizations", tags=["platform_organizations"])
+router = APIRouter(prefix="/tenant-access", tags=["tenant_access"])
 
 
-@router.get("")
-async def list_platform_organizations(request: Request, session: DbSession, claims: CurrentClaims):
+@router.get("/organizations")
+async def list_tenant_access_organizations(request: Request, session: DbSession, claims: CurrentClaims):
     require_platform_super_admin(claims)
     organizations = await OrganizationRepository(session).list_public()
     return api_response(
@@ -32,8 +31,13 @@ async def list_platform_organizations(request: Request, session: DbSession, clai
     )
 
 
-@router.get("/{org_id}/users")
-async def list_platform_organization_users(org_id: int, request: Request, session: DbSession, claims: CurrentClaims):
+@router.get("/organizations/{org_id}/users")
+async def list_tenant_access_organization_users(
+    org_id: int,
+    request: Request,
+    session: DbSession,
+    claims: CurrentClaims,
+):
     require_platform_super_admin(claims)
     user_repo = UserRepository(session)
     users = await user_repo.list_scoped(org_id)
@@ -56,27 +60,16 @@ async def list_platform_organization_users(org_id: int, request: Request, sessio
                 "role_codes": [role_by_id[role_id] for role_id in role_ids if role_id in role_by_id],
             }
         )
-    return api_response(
-        request,
-        rows,
-    )
+    return api_response(request, rows)
 
 
-@router.get("/{org_id}/roles")
-async def list_platform_organization_roles(org_id: int, request: Request, session: DbSession, claims: CurrentClaims):
-    require_platform_super_admin(claims)
-    roles = await RoleRepository(session).list_scoped(org_id)
-    return api_response(request, [serialize_role(role) for role in roles])
-
-
-@router.get("/{org_id}/users/{user_id}/effective-access")
-async def get_platform_organization_user_access(
+@router.get("/organizations/{org_id}/roles")
+async def list_tenant_access_organization_roles(
     org_id: int,
-    user_id: int,
     request: Request,
     session: DbSession,
     claims: CurrentClaims,
 ):
     require_platform_super_admin(claims)
-    access = await EffectiveAccessService(session).for_user(org_id, user_id)
-    return api_response(request, access)
+    roles = await RoleRepository(session).list_scoped(org_id)
+    return api_response(request, [serialize_role(role) for role in roles])

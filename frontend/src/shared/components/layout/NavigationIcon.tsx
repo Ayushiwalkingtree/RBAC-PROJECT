@@ -4,6 +4,7 @@ import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import GroupIcon from '@mui/icons-material/Group';
 import KeyIcon from '@mui/icons-material/Key';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import PreviewIcon from '@mui/icons-material/Preview';
 import SchemaIcon from '@mui/icons-material/Schema';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -22,6 +23,7 @@ const ICONS: Record<string, SvgIconComponent> = {
   preview: PreviewIcon,
   widgets: WidgetsIcon,
   components: WidgetsIcon,
+  workflow: AccountTreeIcon,
 };
 
 type NavigationIconProps = {

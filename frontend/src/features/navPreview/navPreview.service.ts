@@ -88,10 +88,20 @@ const fallbackIconForResourceKey = (resourceKey: string): string => {
   if (key.includes('PERM')) return 'permissions';
   if (key.includes('RESOURCE')) return 'resources';
   if (key.includes('COMPONENT')) return 'widgets';
+  if (key.includes('WORKFLOW')) return 'workflow';
   if (key.includes('REPORT') || key.includes('AUDIT')) return 'reports';
   if (key.includes('SETTING')) return 'settings';
   if (key.includes('TICKET')) return 'tickets';
   return 'dashboard';
+};
+
+const fallbackPathForResourceKey = (resourceKey: string): string => {
+  const key = resourceKey.toUpperCase();
+  if (key === 'WORKFLOW_START_MENU') return '/workflow/start';
+  if (key === 'WORKFLOW_TASKS_MENU') return '/workflow/tasks';
+  if (key === 'WORKFLOW_INSTANCES_MENU') return '/workflow/instances';
+  if (key.includes('WORKFLOW')) return '/workflow/tasks';
+  return '/dashboard';
 };
 
 const mapBackendNavigation = (items: BackendNavigationItem[]): NavigationItem[] =>
@@ -99,7 +109,7 @@ const mapBackendNavigation = (items: BackendNavigationItem[]): NavigationItem[] 
     .map((item) => ({
       id: String(item.id),
       label: item.label,
-      path: item.path || '/dashboard',
+      path: item.path || fallbackPathForResourceKey(item.resource_key),
       icon: item.icon ?? fallbackIconForResourceKey(item.resource_key),
       type: (item.type ?? 'MENU') as ResourceType,
       sequenceNo: item.sequence_no ?? 9999,
@@ -156,7 +166,7 @@ const mapEffectiveAccess = (payload: BackendEffectiveAccess, orgId: string, orgC
 
 export const navPreviewService = {
   listOrganizations: async (): Promise<PreviewOrganization[]> => {
-    const response = await apiClient.get<ApiEnvelope<BackendOrganization[]>>('/platform/organizations');
+    const response = await apiClient.get<ApiEnvelope<BackendOrganization[]>>('/tenant-access/organizations');
     return unwrapApiData(response.data).map((org) => ({
       orgId: String(org.org_id),
       orgCode: org.org_code,
@@ -170,7 +180,7 @@ export const navPreviewService = {
   },
 
   listPlatformUsers: async (orgId: string, orgCode = ''): Promise<UserRecord[]> => {
-    const response = await apiClient.get<ApiEnvelope<BackendUser[]>>(`/platform/organizations/${orgId}/users`);
+    const response = await apiClient.get<ApiEnvelope<BackendUser[]>>(`/tenant-access/organizations/${orgId}/users`);
     return unwrapApiData(response.data).map((user) => mapBackendUser(user, orgId, orgCode));
   },
 

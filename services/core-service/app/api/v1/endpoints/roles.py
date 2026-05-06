@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Request
 from app.dependencies.auth import CurrentClaims, get_current_org_id, get_current_user_id
 from app.dependencies.db import DbSession
 from app.dependencies.permissions import require_permission
+from app.core.rbac import is_platform_super_admin
 from app.repositories.role_repository import RoleRepository
 from app.schemas.role import RoleCreate, RoleResponse, RoleUpdate
 from app.services.role_service import RoleService
@@ -24,7 +25,12 @@ def serialize_role(role) -> dict:
 
 @router.get("", dependencies=[Depends(require_permission("ROLE_MANAGE_API", "READ"))])
 async def list_roles(request: Request, session: DbSession, claims: CurrentClaims):
-    return api_response(request, [serialize_role(role) for role in await RoleRepository(session).list_scoped(get_current_org_id(claims))])
+    repo = RoleRepository(session)
+    if is_platform_super_admin(str(claims.get("org_code", "")), list(claims.get("roles", []))):
+        roles = await repo.list_platform_admin_roles(get_current_org_id(claims))
+    else:
+        roles = await repo.list_visible_for_actor(get_current_org_id(claims), get_current_user_id(claims))
+    return api_response(request, [serialize_role(role) for role in roles])
 
 
 @router.post("", dependencies=[Depends(require_permission("ROLE_MANAGE_API", "CREATE"))])
@@ -35,11 +41,22 @@ async def create_role(payload: RoleCreate, request: Request, session: DbSession,
 
 @router.put("/{role_id}", dependencies=[Depends(require_permission("ROLE_MANAGE_API", "UPDATE"))])
 async def update_role(role_id: int, payload: RoleUpdate, request: Request, session: DbSession, claims: CurrentClaims):
-    role = await RoleService(session).update(get_current_org_id(claims), role_id, payload, get_current_user_id(claims))
+    role = await RoleService(session).update(
+        get_current_org_id(claims),
+        role_id,
+        payload,
+        get_current_user_id(claims),
+        allow_platform_admin_role=is_platform_super_admin(str(claims.get("org_code", "")), list(claims.get("roles", []))),
+    )
     return api_response(request, serialize_role(role))
 
 
 @router.delete("/{role_id}", dependencies=[Depends(require_permission("ROLE_MANAGE_API", "DELETE"))])
 async def delete_role(role_id: int, request: Request, session: DbSession, claims: CurrentClaims):
-    await RoleService(session).delete(get_current_org_id(claims), role_id, get_current_user_id(claims))
+    await RoleService(session).delete(
+        get_current_org_id(claims),
+        role_id,
+        get_current_user_id(claims),
+        allow_platform_admin_role=is_platform_super_admin(str(claims.get("org_code", "")), list(claims.get("roles", []))),
+    )
     return api_response(request, {"deleted": True})

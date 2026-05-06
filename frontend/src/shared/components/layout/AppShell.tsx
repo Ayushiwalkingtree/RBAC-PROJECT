@@ -48,6 +48,7 @@ import { useAuthStore } from '@/features/auth/store/auth.store';
 import { AppButton } from '@/shared/components/AppButton';
 import { useToast } from '@/shared/components/useToast';
 import { usePermission } from '@/shared/hooks/usePermission';
+import { filterNavigationByEffectivePermissions } from '@/shared/services/navigationAccess.service';
 import { navigationOrderService } from '@/shared/services/navigationOrder.service';
 import { getThemePreset } from '@/shared/theme/theme.constants';
 import { useThemeStore } from '@/shared/theme/theme.store';
@@ -250,11 +251,16 @@ export const AppShell = ({ children }: PropsWithChildren) => {
     window.localStorage.setItem(STORAGE_KEYS.navExpanded, JSON.stringify(expandedItems));
   }, [expandedItems]);
 
+  const visibleNavigation = useMemo(
+    () => filterNavigationByEffectivePermissions(session?.navigation ?? [], session?.permissions ?? {}),
+    [session?.navigation, session?.permissions],
+  );
+
   useEffect(() => {
     if (!isNavEditMode) {
-      setDraftNavigation(cloneNavigation(session?.navigation ?? []));
+      setDraftNavigation(cloneNavigation(visibleNavigation));
     }
-  }, [isNavEditMode, session?.navigation]);
+  }, [isNavEditMode, visibleNavigation]);
 
   const canEditNavigation =
     Boolean(session) &&
@@ -272,9 +278,9 @@ export const AppShell = ({ children }: PropsWithChildren) => {
       return selfActive || childActive;
     };
 
-    session?.navigation.forEach(visit);
+    visibleNavigation.forEach(visit);
     return active;
-  }, [location.pathname, session?.navigation]);
+  }, [location.pathname, visibleNavigation]);
 
   const handleLogout = async () => {
     setProfileAnchorEl(null);
@@ -296,7 +302,7 @@ export const AppShell = ({ children }: PropsWithChildren) => {
   };
 
   const handleCancelEditMode = () => {
-    setDraftNavigation(cloneNavigation(session?.navigation ?? []));
+    setDraftNavigation(cloneNavigation(visibleNavigation));
     setIsNavEditMode(false);
   };
 
@@ -470,7 +476,7 @@ export const AppShell = ({ children }: PropsWithChildren) => {
             {renderSortableNavigationItems(draftNavigation)}
           </DndContext>
         ) : (
-          session?.navigation.map((item) => renderNavigationItem(item))
+          visibleNavigation.map((item) => renderNavigationItem(item))
         )}
       </List>
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />

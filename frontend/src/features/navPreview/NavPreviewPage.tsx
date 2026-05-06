@@ -1,6 +1,6 @@
 import EditIcon from '@mui/icons-material/Edit';
-import { Box, Chip, CircularProgress, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
-import { useEffect, useMemo, useState } from 'react';
+import { Box, Chip, CircularProgress, Paper, Stack, Typography } from '@mui/material';
+import { useEffect, useState } from 'react';
 import { DataTable } from '@/shared/components/DataTable';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
@@ -9,7 +9,6 @@ import { useToast } from '@/shared/components/useToast';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import {
   navPreviewService,
-  type PreviewOrganization,
   type UserNavigationPreview,
 } from '@/features/navPreview/navPreview.service';
 import type { UserRecord } from '@/shared/types/auth.types';
@@ -42,21 +41,13 @@ export const NavPreviewPage = () => {
   const { showToast } = useToast();
   const { can } = usePermission();
   const navigate = useNavigate();
-  const [organizations, setOrganizations] = useState<PreviewOrganization[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState('');
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [preview, setPreview] = useState<UserNavigationPreview | null>(null);
-  const [isLoadingOrganizations, setIsLoadingOrganizations] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const isPlatformSuperAdmin = isPlatformSuperAdminSession(session);
   const canEditNavigationOrder = isPlatformSuperAdmin || can(RESOURCE_KEYS.navOrderMenu, PERMISSION_KEYS.view);
-
-  const selectedOrganization = useMemo(
-    () => organizations.find((org) => org.orgId === selectedOrgId),
-    [organizations, selectedOrgId],
-  );
 
   const loadUsers = async (orgId: string, orgCode = '') => {
     setIsLoadingUsers(true);
@@ -64,9 +55,7 @@ export const NavPreviewPage = () => {
     setSelectedUserId('');
     setPreview(null);
     try {
-      const nextUsers = isPlatformSuperAdmin
-        ? await navPreviewService.listPlatformUsers(orgId, orgCode)
-        : await navPreviewService.listUsers(orgId, orgCode);
+      const nextUsers = await navPreviewService.listUsers(orgId, orgCode);
       setUsers(nextUsers);
       setSelectedUserId(nextUsers[0]?.id ?? '');
     } catch (error) {
@@ -78,38 +67,15 @@ export const NavPreviewPage = () => {
 
   useEffect(() => {
     if (!session) return;
-
-    if (isPlatformSuperAdmin) {
-      setIsLoadingOrganizations(true);
-      void navPreviewService
-        .listOrganizations()
-        .then((nextOrganizations) => {
-          setOrganizations(nextOrganizations);
-          setSelectedOrgId('');
-          setUsers([]);
-          setSelectedUserId('');
-          setPreview(null);
-        })
-        .catch((error) => {
-          showToast(error instanceof Error ? error.message : 'Unable to load organizations.', 'error');
-        })
-        .finally(() => setIsLoadingOrganizations(false));
-      return;
-    }
-
     void loadUsers(session.org.id, session.org.code);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlatformSuperAdmin, session?.org.id]);
+  }, [session?.org.id]);
 
   useEffect(() => {
     if (!selectedUserId || !session) return;
 
     setIsLoadingPreview(true);
-    const orgId = isPlatformSuperAdmin ? selectedOrgId : session.org.id;
-    const orgCode = isPlatformSuperAdmin ? selectedOrganization?.orgCode ?? '' : session.org.code;
-    const request = isPlatformSuperAdmin
-      ? navPreviewService.getPlatformPreview(orgId, selectedUserId, orgCode)
-      : navPreviewService.getPreview(selectedUserId, orgId, orgCode);
+    const request = navPreviewService.getPreview(selectedUserId, session.org.id, session.org.code);
 
     void request
       .then(setPreview)
@@ -118,19 +84,7 @@ export const NavPreviewPage = () => {
         showToast(error instanceof Error ? error.message : 'Unable to load navigation preview.', 'error');
       })
       .finally(() => setIsLoadingPreview(false));
-  }, [isPlatformSuperAdmin, selectedOrgId, selectedOrganization?.orgCode, selectedUserId, session, showToast]);
-
-  const handleOrganizationChange = (orgId: string) => {
-    const organization = organizations.find((org) => org.orgId === orgId);
-    setSelectedOrgId(orgId);
-    if (!organization) {
-      setUsers([]);
-      setSelectedUserId('');
-      setPreview(null);
-      return;
-    }
-    void loadUsers(organization.orgId, organization.orgCode);
-  };
+  }, [selectedUserId, session, showToast]);
 
   return (
     <>
@@ -158,22 +112,8 @@ export const NavPreviewPage = () => {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '420px 1fr' }, gap: 2 }}>
         <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2 }}>
           <Stack spacing={2}>
-            {isPlatformSuperAdmin && (
-              <TextField
-                select
-                label="Organization"
-                value={selectedOrgId}
-                onChange={(event) => handleOrganizationChange(event.target.value)}
-                disabled={isLoadingOrganizations}
-                fullWidth
-              >
-                <MenuItem value="">Select organization</MenuItem>
-                {organizations.map((org) => (
-                  <MenuItem key={org.orgId} value={org.orgId}>
-                    {org.orgName} | {org.orgCode}
-                  </MenuItem>
-                ))}
-              </TextField>
+            {import.meta.env.DEV && session && (
+              <Chip label={`Org ${session.org.id} / ${session.org.code}`} size="small" variant="outlined" />
             )}
 
             {isLoadingUsers ? (
@@ -182,8 +122,8 @@ export const NavPreviewPage = () => {
               </Stack>
             ) : users.length === 0 ? (
               <EmptyState
-                title={isPlatformSuperAdmin && !selectedOrgId ? 'Select organization' : 'No users found'}
-                description={isPlatformSuperAdmin && !selectedOrgId ? 'Choose an organization to load its users.' : 'Users will appear here when available.'}
+                title="No users found"
+                description="Users from the current session organization will appear here when available."
               />
             ) : (
               <DataTable

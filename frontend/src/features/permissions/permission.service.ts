@@ -1,4 +1,5 @@
 import { roleService } from '@/features/roles/role.service';
+import { normalizePermissionMatrixDependencies } from '@/shared/adapters/rbacDisplay.adapter';
 import { ACTION_LABELS } from '@/shared/constants/permission.constants';
 import { apiClient, unwrapApiData, type ApiEnvelope } from '@/shared/api/apiClient';
 import type { ResourceRecord, Role } from '@/shared/types/rbac.types';
@@ -58,7 +59,7 @@ export const mapMatrixResource = (resource: BackendMatrixResource): ResourceReco
 });
 
 export const permissionsFromMatrix = (resources: BackendMatrixResource[] = []): Role['permissions'] =>
-  resources.reduce<Role['permissions']>((grants, resource) => {
+  normalizePermissionMatrixDependencies(resources.reduce<Role['permissions']>((grants, resource) => {
     const permissions = resource.available_permissions
       .filter((permission) => permission.granted)
       .map((permission) => permission.key);
@@ -66,7 +67,7 @@ export const permissionsFromMatrix = (resources: BackendMatrixResource[] = []): 
       grants[resource.resource_key] = permissions;
     }
     return grants;
-  }, {});
+  }, {}));
 
 export const permissionService = {
   getRolePermissionsMatrix: async (orgId: string): Promise<PermissionsMatrix> => {
@@ -80,7 +81,7 @@ export const permissionService = {
         const payload = unwrapApiData(response.data);
         const permissions = payload.resources?.length
           ? permissionsFromMatrix(payload.resources)
-          : payload.permissions_json ?? {};
+          : normalizePermissionMatrixDependencies(payload.permissions_json ?? {});
         return {
           role: { ...role, permissions },
           resources: payload.resources ?? [],
@@ -100,8 +101,9 @@ export const permissionService = {
     actor?: { userId?: string; email?: string },
   ): Promise<Role> => {
     void actor;
+    const normalizedPermissions = normalizePermissionMatrixDependencies(permissions);
     const response = await apiClient.put<ApiEnvelope<BackendRolePermissions>>(`/roles/${roleId}/permissions`, {
-      permissions_json: permissions,
+      permissions_json: normalizedPermissions,
     });
     const payload = unwrapApiData(response.data);
     return {
@@ -110,7 +112,9 @@ export const permissionService = {
       code: payload.role_code ?? '',
       name: payload.role_code ?? '',
       description: '',
-      permissions: payload.resources?.length ? permissionsFromMatrix(payload.resources) : payload.permissions_json ?? {},
+      permissions: payload.resources?.length
+        ? permissionsFromMatrix(payload.resources)
+        : normalizePermissionMatrixDependencies(payload.permissions_json ?? {}),
     };
   },
 };

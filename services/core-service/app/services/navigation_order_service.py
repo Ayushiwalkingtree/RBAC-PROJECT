@@ -145,6 +145,6 @@ class NavigationOrderService:
         user = await self.user_repo.get_scoped(org_id, user_id)
         if not user:
             raise AppError(404, "USER_NOT_FOUND", "User was not found")
-        role_ids = await self.user_repo.role_ids_for_user(user.id)
-        role_perms = await self.role_repo.permissions_for_roles(role_ids)
+        role_ids = await self.user_repo.role_ids_for_user(user.id, org_id)
+        role_perms = await self.role_repo.permissions_for_roles(role_ids, org_id)
         return merge_permissions([permission.permissions_json for permission in role_perms])

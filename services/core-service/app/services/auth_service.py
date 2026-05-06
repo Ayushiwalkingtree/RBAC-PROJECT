@@ -30,8 +30,8 @@ class AuthService:
         self.audit = AuditService(session)
 
     async def _session_access(self, org, user) -> tuple[list[str], dict[str, list[str]], list[dict]]:
-        role_ids = await self.user_repo.role_ids_for_user(user.id)
-        role_perms = await self.role_repo.permissions_for_roles(role_ids)
+        role_ids = await self.user_repo.role_ids_for_user(user.id, org.id)
+        role_perms = await self.role_repo.permissions_for_roles(role_ids, org.id)
         roles = await self.role_repo.list_scoped(org.id)
         current_roles = [role.role_code for role in roles if role.id in role_ids]
         perms = merge_permissions([permission.permissions_json for permission in role_perms])

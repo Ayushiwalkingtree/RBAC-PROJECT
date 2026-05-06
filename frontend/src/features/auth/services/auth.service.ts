@@ -4,6 +4,7 @@ import type { AuthSession, LoginCredentials, Organization, SignupInput, SignupRe
 import type { ResourceRecord, Role } from '@/shared/types/rbac.types';
 import type { NavigationItem } from '@/shared/types/navigation.types';
 import type { ResourceType } from '@/shared/constants/permission.constants';
+import { filterNavigationByEffectivePermissions } from '@/shared/services/navigationAccess.service';
 
 const passwordPolicyMessage = 'Password must be 8+ chars with uppercase, number, and special character.';
 
@@ -79,17 +80,27 @@ const fallbackIconForResourceKey = (resourceKey: string): string => {
   if (key.includes('PERM')) return 'permissions';
   if (key.includes('RESOURCE')) return 'resources';
   if (key.includes('COMPONENT')) return 'widgets';
+  if (key.includes('WORKFLOW')) return 'workflow';
   if (key.includes('REPORT') || key.includes('AUDIT')) return 'reports';
   if (key.includes('SETTING') || key.includes('ORG_SETTINGS')) return 'settings';
   if (key.includes('TICKET')) return 'tickets';
   return 'dashboard';
 };
 
+const fallbackPathForResourceKey = (resourceKey: string): string => {
+  const key = resourceKey.toUpperCase();
+  if (key === 'WORKFLOW_START_MENU') return '/workflow/start';
+  if (key === 'WORKFLOW_TASKS_MENU') return '/workflow/tasks';
+  if (key === 'WORKFLOW_INSTANCES_MENU') return '/workflow/instances';
+  if (key.includes('WORKFLOW')) return '/workflow/tasks';
+  return '/dashboard';
+};
+
 const mapBackendNavigation = (items: BackendNavigationItem[]): NavigationItem[] =>
   items.map((item) => ({
     id: String(item.id),
     label: item.label,
-    path: item.path || '/dashboard',
+    path: item.path || fallbackPathForResourceKey(item.resource_key),
     icon: item.icon ?? fallbackIconForResourceKey(item.resource_key),
     type: (item.type ?? 'MENU') as ResourceType,
     sequenceNo: item.sequence_no ?? 9999,
@@ -138,7 +149,7 @@ const mapBackendAuthSession = (payload: BackendAuthResponse): AuthSession => {
     roles,
     permissions: payload.perms,
     resources: [] as ResourceRecord[],
-    navigation: mapBackendNavigation(payload.nav),
+    navigation: filterNavigationByEffectivePermissions(mapBackendNavigation(payload.nav), payload.perms),
   };
 };
 

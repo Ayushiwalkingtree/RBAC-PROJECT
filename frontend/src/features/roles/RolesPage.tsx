@@ -49,6 +49,11 @@ export const RolesPage = () => {
   };
 
   useEffect(() => {
+    setRoles([]);
+    setCreateDialogOpen(false);
+    setEditingRole(null);
+    setDeletingRole(null);
+    reset(emptyRoleValues);
     void loadRoles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.org.id]);
@@ -125,6 +130,9 @@ export const RolesPage = () => {
   return (
     <>
       <PageHeader title="Roles" subtitle="Create role bundles; enforcement still uses permissions only.">
+        {import.meta.env.DEV && session && (
+          <Chip label={`Org ${session.org.id} / ${session.org.code}`} size="small" variant="outlined" />
+        )}
         <PermissionGuard resource={RESOURCE_KEYS.roleManageApi} permission={PERMISSION_KEYS.create}>
           <AppButton startIcon={<AddIcon />} onClick={() => setCreateDialogOpen(true)}>
             Create role

@@ -19,6 +19,7 @@ export const PERMISSION_KEYS = {
   download: 'DOWNLOAD',
   approve: 'APPROVE',
   reject: 'REJECT',
+  return: 'RETURN',
   configure: 'CONFIGURE',
 } as const;
 
@@ -47,6 +48,7 @@ export const RESOURCE_GROUP_OPTIONS = [
   'Role Management',
   'Reports',
   'Tickets',
+  'Workflow',
   'Settings',
   'Admin',
 ] as const;
@@ -61,6 +63,7 @@ export const ACTION_LABELS: Record<string, string> = {
   DOWNLOAD: 'Download',
   APPROVE: 'Approve',
   REJECT: 'Reject',
+  RETURN: 'Return',
   ASSIGN: 'Assign',
   CONFIGURE: 'Configure',
   EXECUTE: 'Execute',
@@ -76,6 +79,7 @@ export const ADMIN_ACTION_OPTIONS = [
   PERMISSION_KEYS.download,
   PERMISSION_KEYS.approve,
   PERMISSION_KEYS.reject,
+  PERMISSION_KEYS.return,
   'ASSIGN',
   PERMISSION_KEYS.configure,
   PERMISSION_KEYS.execute,
@@ -127,6 +131,21 @@ export const RESOURCE_KEYS = {
   auditLogsMenu: 'AUDIT_LOG_MENU',
   auditLogApi: 'AUDIT_LOG_API',
   componentsMenu: 'COMPONENTS_MENU',
+  workflowMenu: 'WORKFLOW_MENU',
+  workflowStartMenu: 'WORKFLOW_START_MENU',
+  workflowTasksMenu: 'WORKFLOW_TASKS_MENU',
+  workflowInstancesMenu: 'WORKFLOW_INSTANCES_MENU',
+  workflowStartApi: 'WORKFLOW_START_API',
+  workflowPendingTasksApi: 'WORKFLOW_PENDING_TASKS_API',
+  workflowTaskDetailApi: 'WORKFLOW_TASK_DETAIL_API',
+  workflowTaskActionApi: 'WORKFLOW_TASK_ACTION_API',
+  workflowTaskClaimApi: 'WORKFLOW_TASK_CLAIM_API',
+  workflowTaskReminderApi: 'WORKFLOW_TASK_REMINDER_API',
+  workflowInstanceDetailApi: 'WORKFLOW_INSTANCE_DETAIL_API',
+  workflowApproveButton: 'WORKFLOW_APPROVE_BTN',
+  workflowRejectButton: 'WORKFLOW_REJECT_BTN',
+  workflowClaimButton: 'WORKFLOW_CLAIM_BTN',
+  workflowReminderButton: 'WORKFLOW_REMINDER_BTN',
   settingsMenu: 'SETTINGS_MENU',
   settingsManageApi: 'SETTINGS_MANAGE_API',
   navPreviewMenu: 'NAV_PREVIEW_MENU',
@@ -224,6 +243,38 @@ export const RESOURCE_PERMISSION_RULES = {
   auditLogs: {
     menuView: { resource: RESOURCE_KEYS.auditLogsMenu, permission: PERMISSION_KEYS.view },
     read: [{ resource: RESOURCE_KEYS.auditLogApi, permission: PERMISSION_KEYS.read }],
+  },
+  workflow: {
+    menuView: { resource: RESOURCE_KEYS.workflowMenu, permission: PERMISSION_KEYS.view },
+    start: [
+      { resource: RESOURCE_KEYS.workflowStartMenu, permission: PERMISSION_KEYS.view },
+      { resource: RESOURCE_KEYS.workflowStartApi, permission: PERMISSION_KEYS.execute },
+    ],
+    pendingTasks: [
+      { resource: RESOURCE_KEYS.workflowTasksMenu, permission: PERMISSION_KEYS.view },
+      { resource: RESOURCE_KEYS.workflowPendingTasksApi, permission: PERMISSION_KEYS.read },
+    ],
+    taskDetail: [{ resource: RESOURCE_KEYS.workflowTaskDetailApi, permission: PERMISSION_KEYS.read }],
+    instanceDetail: [{ resource: RESOURCE_KEYS.workflowInstanceDetailApi, permission: PERMISSION_KEYS.read }],
+    claim: [
+      { resource: RESOURCE_KEYS.workflowClaimButton, permission: PERMISSION_KEYS.view },
+      { resource: RESOURCE_KEYS.workflowTaskClaimApi, permission: PERMISSION_KEYS.execute },
+    ],
+    approve: [
+      { resource: RESOURCE_KEYS.workflowApproveButton, permission: PERMISSION_KEYS.view },
+      { resource: RESOURCE_KEYS.workflowTaskActionApi, permission: PERMISSION_KEYS.approve },
+    ],
+    reject: [
+      { resource: RESOURCE_KEYS.workflowRejectButton, permission: PERMISSION_KEYS.view },
+      { resource: RESOURCE_KEYS.workflowTaskActionApi, permission: PERMISSION_KEYS.reject },
+    ],
+    return: [
+      { resource: RESOURCE_KEYS.workflowTaskActionApi, permission: PERMISSION_KEYS.return },
+    ],
+    reminder: [
+      { resource: RESOURCE_KEYS.workflowReminderButton, permission: PERMISSION_KEYS.view },
+      { resource: RESOURCE_KEYS.workflowTaskReminderApi, permission: PERMISSION_KEYS.execute },
+    ],
   },
 } as const;
 

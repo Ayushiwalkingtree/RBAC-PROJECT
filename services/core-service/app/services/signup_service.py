@@ -35,6 +35,21 @@ CORE_ORG_ADMIN_PERMISSIONS: dict[str, list[str]] = {
     "DASH_MENU": ["VIEW"],
     "DASH_MAIN": ["VIEW"],
     "REPORTS_MENU": ["VIEW"],
+    "WORKFLOW_MENU": ["VIEW"],
+    "WORKFLOW_START_MENU": ["VIEW"],
+    "WORKFLOW_TASKS_MENU": ["VIEW"],
+    "WORKFLOW_INSTANCES_MENU": ["VIEW"],
+    "WORKFLOW_START_API": ["EXECUTE"],
+    "WORKFLOW_PENDING_TASKS_API": ["READ"],
+    "WORKFLOW_TASK_DETAIL_API": ["READ"],
+    "WORKFLOW_TASK_ACTION_API": ["APPROVE", "REJECT", "RETURN"],
+    "WORKFLOW_TASK_CLAIM_API": ["EXECUTE"],
+    "WORKFLOW_TASK_REMINDER_API": ["EXECUTE"],
+    "WORKFLOW_INSTANCE_DETAIL_API": ["READ"],
+    "WORKFLOW_APPROVE_BTN": ["VIEW"],
+    "WORKFLOW_REJECT_BTN": ["VIEW"],
+    "WORKFLOW_CLAIM_BTN": ["VIEW"],
+    "WORKFLOW_REMINDER_BTN": ["VIEW"],
 }
 
 def dev_verification_url(token: str) -> str | None:
@@ -84,13 +99,12 @@ class SignupService:
         )
         self.session.add(role)
         await self.session.flush()
-        self.session.add(
-            RolePermission(
-                role_id=role.id,
-                at_organization_id=org.id,
-                permissions_json=CORE_ORG_ADMIN_PERMISSIONS,
-            )
+        role_permissions = RolePermission(
+            role_id=role.id,
+            at_organization_id=org.id,
+            permissions_json=CORE_ORG_ADMIN_PERMISSIONS,
         )
+        self.session.add(role_permissions)
 
         user = User(
             at_organization_id=org.id,
@@ -104,6 +118,9 @@ class SignupService:
         )
         self.user_repo.add(user)
         await self.session.flush()
+        role.created_by = user.id
+        role_permissions.created_by = user.id
+        user.created_by = user.id
         self.user_repo.add_role(
             UserRole(
                 user_id=user.id,
@@ -111,6 +128,7 @@ class SignupService:
                 at_organization_id=org.id,
                 assigned_at=utcnow(),
                 assigned_by=user.id,
+                created_by=user.id,
             )
         )
 

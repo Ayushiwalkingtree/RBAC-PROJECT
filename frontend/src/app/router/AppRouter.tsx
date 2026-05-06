@@ -15,11 +15,16 @@ import { SettingsPage } from '@/features/settings/SettingsPage';
 import { TenantAdminAccessPage } from '@/features/tenantAdminAccess/TenantAdminAccessPage';
 import { TicketsPage } from '@/features/tickets/TicketsPage';
 import { UsersPage } from '@/features/users/UsersPage';
+import { PendingTasksPage } from '@/features/workflow/pages/PendingTasksPage';
+import { StartWorkflowPage } from '@/features/workflow/pages/StartWorkflowPage';
+import { TaskDetailPage } from '@/features/workflow/pages/TaskDetailPage';
+import { WorkflowInstancePage } from '@/features/workflow/pages/WorkflowInstancePage';
 import { NavPreviewPage } from '@/features/navPreview/NavPreviewPage';
 import { NavigationOrderPage } from '@/features/navigationOrder/NavigationOrderPage';
 import { AppShell } from '@/shared/components/layout/AppShell';
 import { AuthGuard } from '@/shared/components/guards/AuthGuard';
 import { PermissionGuard } from '@/shared/components/guards/PermissionGuard';
+import { EmptyState } from '@/shared/components/EmptyState';
 import { APP_CONFIG } from '@/shared/constants/app.constants';
 import { ROUTE_PERMISSIONS, ROUTES } from '@/shared/constants/route.constants';
 import { PERMISSION_KEYS, RESOURCE_KEYS } from '@/shared/constants/permission.constants';
@@ -44,6 +49,15 @@ const protectedElement = (path: keyof typeof ROUTE_PERMISSIONS, element: ReactEl
   );
 };
 
+const protectedAllElement = (
+  requirements: ReadonlyArray<{ resource: string; permission: string }>,
+  element: ReactElement,
+) => (
+  <PermissionGuard allOf={requirements} redirect>
+    {element}
+  </PermissionGuard>
+);
+
 export const AppRouter = () => (
   <Router>
     <Routes>
@@ -58,7 +72,15 @@ export const AppRouter = () => (
           <Route path={ROUTES.roles} element={protectedElement(ROUTES.roles, <RolesPage />)} />
           <Route
             path={ROUTES.permissions}
-            element={protectedElement(ROUTES.permissions, <PermissionsMatrixPage />)}
+            element={(
+              <PermissionGuard
+                resource={RESOURCE_KEYS.permissionGrantApi}
+                permission={PERMISSION_KEYS.read}
+                fallback={<EmptyState title="Unauthorized" description="You do not have permission to view this page." />}
+              >
+                <PermissionsMatrixPage />
+              </PermissionGuard>
+            )}
           />
           <Route
             path={ROUTES.tickets}
@@ -78,6 +100,32 @@ export const AppRouter = () => (
           <Route path={ROUTES.auditLogs} element={protectedElement(ROUTES.auditLogs, <AuditLogsPage />)} />
           <Route path={ROUTES.settings} element={protectedElement(ROUTES.settings, <SettingsPage />)} />
           <Route path={ROUTES.components} element={protectedElement(ROUTES.components, <ComponentLibraryPage />)} />
+          <Route
+            path={ROUTES.workflowStart}
+            element={protectedAllElement(
+              [
+                { resource: RESOURCE_KEYS.workflowStartMenu, permission: PERMISSION_KEYS.view },
+                { resource: RESOURCE_KEYS.workflowStartApi, permission: PERMISSION_KEYS.execute },
+              ],
+              <StartWorkflowPage />,
+            )}
+          />
+          <Route
+            path={ROUTES.workflowTasks}
+            element={protectedAllElement(
+              [
+                { resource: RESOURCE_KEYS.workflowTasksMenu, permission: PERMISSION_KEYS.view },
+                { resource: RESOURCE_KEYS.workflowPendingTasksApi, permission: PERMISSION_KEYS.read },
+              ],
+              <PendingTasksPage />,
+            )}
+          />
+          <Route path={ROUTES.workflowTaskDetail} element={protectedElement(ROUTES.workflowTaskDetail, <TaskDetailPage />)} />
+          <Route path={ROUTES.workflowInstances} element={protectedElement(ROUTES.workflowInstances, <WorkflowInstancePage />)} />
+          <Route
+            path={ROUTES.workflowInstanceDetail}
+            element={protectedElement(ROUTES.workflowInstanceDetail, <WorkflowInstancePage />)}
+          />
           <Route
             path={ROUTES.resourceRegistry}
             element={protectedElement(ROUTES.resourceRegistry, <ResourceRegistryPage />)}

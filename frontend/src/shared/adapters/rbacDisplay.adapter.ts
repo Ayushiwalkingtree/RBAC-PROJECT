@@ -29,6 +29,8 @@ export type BusinessPermissionRow = {
 };
 
 const INTERNAL_SUFFIX_PATTERN = /_(API|BTN|BUTTON)$/u;
+const PERMISSION_MATRIX_VIEW_ACTION_ID = 'view-permissions';
+const PERMISSION_MATRIX_CONFIGURE_ACTION_ID = 'configure-permissions';
 
 const titleCase = (value: string): string =>
   value
@@ -121,15 +123,130 @@ export const getTechnicalSummary = (resources: ResourceRecord[], resourceKeys: R
 export const isBusinessActionSelected = (
   grants: RolePermissionGrants,
   actionItem: BusinessPermissionAction,
-): boolean =>
-  actionItem.grants.every((grant) => grants[grant.resource]?.includes(grant.permission));
+): boolean => {
+  if (actionItem.id === PERMISSION_MATRIX_CONFIGURE_ACTION_ID) {
+    return grants[RESOURCE_KEYS.permissionGrantApi]?.includes(PERMISSION_KEYS.configure) ?? false;
+  }
+
+  return actionItem.grants.every((grant) => grants[grant.resource]?.includes(grant.permission));
+};
+
+const cloneNormalizedGrants = (grants: RolePermissionGrants): RolePermissionGrants =>
+  Object.entries(grants).reduce<RolePermissionGrants>((nextGrants, [resourceKey, permissions]) => {
+    const normalizedPermissions = [...new Set(permissions.map((permission) => permission.toUpperCase()))].sort();
+    if (normalizedPermissions.length > 0) {
+      nextGrants[resourceKey] = normalizedPermissions;
+    }
+    return nextGrants;
+  }, {});
+
+const addGrant = (
+  grants: RolePermissionGrants,
+  resource: ResourceKey,
+  permission: PermissionKey,
+): void => {
+  const permissions = new Set(grants[resource] ?? []);
+  permissions.add(permission);
+  grants[resource] = [...permissions].sort();
+};
+
+const removeGrant = (
+  grants: RolePermissionGrants,
+  resource: ResourceKey,
+  permission: PermissionKey,
+): void => {
+  const permissions = new Set(grants[resource] ?? []);
+  permissions.delete(permission);
+  if (permissions.size === 0) {
+    delete grants[resource];
+    return;
+  }
+  grants[resource] = [...permissions].sort();
+};
+
+export const normalizePermissionMatrixDependencies = (
+  grants: RolePermissionGrants,
+): RolePermissionGrants => {
+  const nextGrants = cloneNormalizedGrants(grants);
+  const permissionGrantPermissions = new Set(nextGrants[RESOURCE_KEYS.permissionGrantApi] ?? []);
+  const permissionMenuPermissions = new Set(nextGrants[RESOURCE_KEYS.permissionsMenu] ?? []);
+
+  if (permissionGrantPermissions.has(PERMISSION_KEYS.configure)) {
+    permissionGrantPermissions.add(PERMISSION_KEYS.read);
+    permissionMenuPermissions.add(PERMISSION_KEYS.view);
+  }
+
+  if (permissionMenuPermissions.has(PERMISSION_KEYS.view)) {
+    permissionGrantPermissions.add(PERMISSION_KEYS.read);
+  }
+
+  if (!permissionGrantPermissions.has(PERMISSION_KEYS.read)) {
+    permissionGrantPermissions.delete(PERMISSION_KEYS.configure);
+  }
+
+  if (permissionGrantPermissions.size > 0) {
+    nextGrants[RESOURCE_KEYS.permissionGrantApi] = [...permissionGrantPermissions].sort();
+  } else {
+    delete nextGrants[RESOURCE_KEYS.permissionGrantApi];
+  }
+
+  if (permissionMenuPermissions.size > 0) {
+    nextGrants[RESOURCE_KEYS.permissionsMenu] = [...permissionMenuPermissions].sort();
+  } else {
+    delete nextGrants[RESOURCE_KEYS.permissionsMenu];
+  }
+
+  return nextGrants;
+};
+
+export const applyPermissionDependency = (
+  currentPermissions: RolePermissionGrants,
+  clickedAction: BusinessPermissionAction,
+  nextSelected: boolean,
+): RolePermissionGrants => {
+  const nextGrants = cloneNormalizedGrants(currentPermissions);
+
+  if (clickedAction.id === PERMISSION_MATRIX_VIEW_ACTION_ID) {
+    if (nextSelected) {
+      addGrant(nextGrants, RESOURCE_KEYS.permissionsMenu, PERMISSION_KEYS.view);
+      addGrant(nextGrants, RESOURCE_KEYS.permissionGrantApi, PERMISSION_KEYS.read);
+      return normalizePermissionMatrixDependencies(nextGrants);
+    }
+
+    removeGrant(nextGrants, RESOURCE_KEYS.permissionsMenu, PERMISSION_KEYS.view);
+    removeGrant(nextGrants, RESOURCE_KEYS.permissionGrantApi, PERMISSION_KEYS.read);
+    removeGrant(nextGrants, RESOURCE_KEYS.permissionGrantApi, PERMISSION_KEYS.configure);
+    return normalizePermissionMatrixDependencies(nextGrants);
+  }
+
+  if (clickedAction.id === PERMISSION_MATRIX_CONFIGURE_ACTION_ID) {
+    if (nextSelected) {
+      addGrant(nextGrants, RESOURCE_KEYS.permissionsMenu, PERMISSION_KEYS.view);
+      addGrant(nextGrants, RESOURCE_KEYS.permissionGrantApi, PERMISSION_KEYS.read);
+      addGrant(nextGrants, RESOURCE_KEYS.permissionGrantApi, PERMISSION_KEYS.configure);
+      return normalizePermissionMatrixDependencies(nextGrants);
+    }
+
+    removeGrant(nextGrants, RESOURCE_KEYS.permissionGrantApi, PERMISSION_KEYS.configure);
+    return normalizePermissionMatrixDependencies(nextGrants);
+  }
+
+  return normalizePermissionMatrixDependencies(nextGrants);
+};
 
 export const applyBusinessActionToggle = (
   grants: RolePermissionGrants,
   actionItem: BusinessPermissionAction,
 ): RolePermissionGrants => {
   const shouldRemove = isBusinessActionSelected(grants, actionItem);
-  const nextGrants: RolePermissionGrants = { ...grants };
+  const nextGrants = cloneNormalizedGrants(grants);
+
+  if (
+    actionItem.id === PERMISSION_MATRIX_VIEW_ACTION_ID ||
+    actionItem.id === PERMISSION_MATRIX_CONFIGURE_ACTION_ID
+  ) {
+    return applyPermissionDependency(nextGrants, actionItem, !shouldRemove);
+  }
 
   actionItem.grants.forEach((grant) => {
     const currentPermissions = new Set(nextGrants[grant.resource] ?? []);
@@ -148,7 +265,7 @@ export const applyBusinessActionToggle = (
     nextGrants[grant.resource] = [...currentPermissions].sort();
   });
 
-  return nextGrants;
+  return normalizePermissionMatrixDependencies(nextGrants);
 };
 
 export const buildBusinessPermissionRows = (resources: ResourceRecord[]): BusinessPermissionRow[] => {
@@ -266,6 +383,7 @@ export const buildBusinessPermissionRows = (resources: ResourceRecord[]): Busine
         compactActions([
           actionIfAvailable(resourcesByKey, 'view-permissions', 'View Permissions', [
             { resource: RESOURCE_KEYS.permissionsMenu, permission: PERMISSION_KEYS.view },
+            { resource: RESOURCE_KEYS.permissionGrantApi, permission: PERMISSION_KEYS.read },
           ]),
           actionIfAvailable(resourcesByKey, 'configure-permissions', 'Configure Permissions', [
             { resource: RESOURCE_KEYS.permissionGrantApi, permission: PERMISSION_KEYS.configure },
@@ -403,6 +521,74 @@ export const buildBusinessPermissionRows = (resources: ResourceRecord[]): Busine
     );
   }
 
+  if (hasAnyResource(resourcesByKey, [RESOURCE_KEYS.workflowMenu, RESOURCE_KEYS.workflowStartApi, RESOURCE_KEYS.workflowTaskDetailApi])) {
+    rows.push(
+      row(
+        'workflow',
+        'Workflow',
+        'Workflow',
+        'Feature',
+        'Workflow runtime task permissions',
+        compactActions([
+          actionIfAvailable(resourcesByKey, 'view-workflow', 'View Workflow', [
+            { resource: RESOURCE_KEYS.workflowMenu, permission: PERMISSION_KEYS.view },
+          ]),
+          actionIfAvailable(resourcesByKey, 'start-task-workflow', 'Start Task Workflow', [
+            { resource: RESOURCE_KEYS.workflowStartMenu, permission: PERMISSION_KEYS.view },
+            { resource: RESOURCE_KEYS.workflowStartApi, permission: PERMISSION_KEYS.execute },
+          ]),
+          actionIfAvailable(resourcesByKey, 'view-pending-tasks', 'View Pending Tasks', [
+            { resource: RESOURCE_KEYS.workflowTasksMenu, permission: PERMISSION_KEYS.view },
+            { resource: RESOURCE_KEYS.workflowPendingTasksApi, permission: PERMISSION_KEYS.read },
+          ]),
+          actionIfAvailable(resourcesByKey, 'view-task-detail', 'View Task Detail', [
+            { resource: RESOURCE_KEYS.workflowTaskDetailApi, permission: PERMISSION_KEYS.read },
+          ]),
+          actionIfAvailable(resourcesByKey, 'claim-task', 'Claim Task', [
+            { resource: RESOURCE_KEYS.workflowClaimButton, permission: PERMISSION_KEYS.view },
+            { resource: RESOURCE_KEYS.workflowTaskClaimApi, permission: PERMISSION_KEYS.execute },
+          ]),
+          actionIfAvailable(resourcesByKey, 'approve-task', 'Approve Task', [
+            { resource: RESOURCE_KEYS.workflowApproveButton, permission: PERMISSION_KEYS.view },
+            { resource: RESOURCE_KEYS.workflowTaskActionApi, permission: PERMISSION_KEYS.approve },
+          ]),
+          actionIfAvailable(resourcesByKey, 'reject-task', 'Reject Task', [
+            { resource: RESOURCE_KEYS.workflowRejectButton, permission: PERMISSION_KEYS.view },
+            { resource: RESOURCE_KEYS.workflowTaskActionApi, permission: PERMISSION_KEYS.reject },
+          ]),
+          actionIfAvailable(resourcesByKey, 'return-task', 'Return Task', [
+            { resource: RESOURCE_KEYS.workflowTaskActionApi, permission: PERMISSION_KEYS.return },
+          ]),
+          actionIfAvailable(resourcesByKey, 'send-reminder', 'Send Reminder', [
+            { resource: RESOURCE_KEYS.workflowReminderButton, permission: PERMISSION_KEYS.view },
+            { resource: RESOURCE_KEYS.workflowTaskReminderApi, permission: PERMISSION_KEYS.execute },
+          ]),
+          actionIfAvailable(resourcesByKey, 'view-workflow-instance', 'View Workflow Instance', [
+            { resource: RESOURCE_KEYS.workflowInstancesMenu, permission: PERMISSION_KEYS.view },
+            { resource: RESOURCE_KEYS.workflowInstanceDetailApi, permission: PERMISSION_KEYS.read },
+          ]),
+        ]),
+        [
+          RESOURCE_KEYS.workflowMenu,
+          RESOURCE_KEYS.workflowStartMenu,
+          RESOURCE_KEYS.workflowTasksMenu,
+          RESOURCE_KEYS.workflowInstancesMenu,
+          RESOURCE_KEYS.workflowStartApi,
+          RESOURCE_KEYS.workflowPendingTasksApi,
+          RESOURCE_KEYS.workflowTaskDetailApi,
+          RESOURCE_KEYS.workflowTaskActionApi,
+          RESOURCE_KEYS.workflowTaskClaimApi,
+          RESOURCE_KEYS.workflowTaskReminderApi,
+          RESOURCE_KEYS.workflowInstanceDetailApi,
+          RESOURCE_KEYS.workflowApproveButton,
+          RESOURCE_KEYS.workflowRejectButton,
+          RESOURCE_KEYS.workflowClaimButton,
+          RESOURCE_KEYS.workflowReminderButton,
+        ],
+      ),
+    );
+  }
+
   if (hasAnyResource(resourcesByKey, [RESOURCE_KEYS.reportsMenu])) {
     rows.push(
       row(
@@ -461,6 +647,10 @@ export const buildBusinessPermissionRows = (resources: ResourceRecord[]): Busine
         RESOURCE_KEYS.tenantAdminAccessMenu,
         RESOURCE_KEYS.navPreviewMenu,
         RESOURCE_KEYS.navOrderMenu,
+        RESOURCE_KEYS.workflowMenu,
+        RESOURCE_KEYS.workflowStartMenu,
+        RESOURCE_KEYS.workflowTasksMenu,
+        RESOURCE_KEYS.workflowInstancesMenu,
         RESOURCE_KEYS.settingsMenu,
       ]);
       return !hiddenBusinessKeys.has(resource.resourceKey);

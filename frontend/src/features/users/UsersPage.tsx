@@ -98,6 +98,15 @@ export const UsersPage = () => {
   }, [session]);
 
   useEffect(() => {
+    setUsers([]);
+    setRoles([]);
+    setEditingUser(null);
+    setRoleAssignmentUser(null);
+    setRoleAssignmentDraft([]);
+    setDeleteUser(null);
+  }, [session?.org.id]);
+
+  useEffect(() => {
     void loadData();
   }, [loadData]);
 
@@ -272,6 +281,9 @@ export const UsersPage = () => {
   return (
     <>
       <PageHeader title="Users" subtitle="Create users, assign roles, and manage tenant access.">
+        {import.meta.env.DEV && session && (
+          <Chip label={`Org ${session.org.id} / ${session.org.code}`} size="small" variant="outlined" />
+        )}
         {canCreateUser && (
           <AppButton startIcon={<AddIcon />} onClick={openCreateDialog}>
             Create user
@@ -312,7 +324,11 @@ export const UsersPage = () => {
               render: (user) => (
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                   {user.roleIds.map((roleId) => (
-                    <Chip key={roleId} label={roleNameById.get(roleId) ?? roleId} size="small" />
+                    <Chip
+                      key={roleId}
+                      label={roleNameById.get(roleId) ?? user.roleCodes?.[user.roleIds.indexOf(roleId)] ?? roleId}
+                      size="small"
+                    />
                   ))}
                 </Stack>
               ),

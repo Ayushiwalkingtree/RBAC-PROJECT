@@ -33,7 +33,13 @@ class UserService:
         self.audit = AuditService(session)
         self.email_service = EmailService()
 
-    async def create(self, org_id: int, payload: UserCreate, actor_user_id: int) -> tuple[User, str | None]:
+    async def create(
+        self,
+        org_id: int,
+        payload: UserCreate,
+        actor_user_id: int,
+        allow_platform_admin_roles: bool = False,
+    ) -> tuple[User, str | None]:
         org = await self.org_repo.get(org_id)
         if not org or org.is_deleted:
             raise AppError(404, "ORGANIZATION_NOT_FOUND", "Organization was not found")
@@ -44,7 +50,10 @@ class UserService:
                 message += " User already exists but is not verified. Resend verification email."
             raise AppError(409, "EMAIL_EXISTS", message)
         for role_id in payload.role_ids:
-            if not await self.role_repo.get_scoped(org_id, role_id):
+            role = await self.role_repo.get_visible_for_actor(org_id, role_id, actor_user_id)
+            if not role and allow_platform_admin_roles:
+                role = await self.role_repo.get_platform_admin_role(org_id, role_id)
+            if not role:
                 raise AppError(404, "ROLE_NOT_FOUND", "Role was not found")
         user = User(
             at_organization_id=org_id,
@@ -57,6 +66,7 @@ class UserService:
             is_active=payload.is_active,
             is_email_verified=False,
             password_changed_at=utcnow(),
+            created_by=actor_user_id,
         )
         self.repo.add(user)
         await self.session.flush()
@@ -68,6 +78,7 @@ class UserService:
                     at_organization_id=org_id,
                     assigned_at=utcnow(),
                     assigned_by=actor_user_id,
+                    created_by=actor_user_id,
                 )
             )
         token = new_verification_token()
@@ -92,7 +103,7 @@ class UserService:
         return user, dev_verification_url(token)
 
     async def update(self, org_id: int, user_id: int, payload: UserUpdate, actor_user_id: int | None = None) -> User:
-        user = await self.repo.get_scoped(org_id, user_id)
+        user = await self.repo.get_visible_for_actor(org_id, user_id, actor_user_id) if actor_user_id else await self.repo.get_scoped(org_id, user_id)
         if not user:
             raise AppError(404, "USER_NOT_FOUND", "User was not found")
         old_value = {
@@ -144,7 +155,7 @@ class UserService:
         return user
 
     async def delete(self, org_id: int, user_id: int, actor_user_id: int | None = None) -> None:
-        user = await self.repo.get_scoped(org_id, user_id)
+        user = await self.repo.get_visible_for_actor(org_id, user_id, actor_user_id) if actor_user_id else await self.repo.get_scoped(org_id, user_id)
         if not user:
             raise AppError(404, "USER_NOT_FOUND", "User was not found")
         user.is_deleted = True

@@ -1,11 +1,13 @@
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SaveIcon from '@mui/icons-material/Save';
-import { Box, Chip, CircularProgress, Divider, Paper, Stack, Tooltip, Typography } from '@mui/material';
-import { useMemo, useState } from 'react';
+import { Alert, Box, Chip, CircularProgress, Divider, MenuItem, Paper, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import { useEffect, useMemo, useState } from 'react';
+import { useAuthStore } from '@/features/auth/store/auth.store';
 import {
   tenantAdminAccessService,
   type TenantAdminAccessMatrix,
   type TenantAdminRow,
+  type TenantAccessOrganization,
 } from '@/features/tenantAdminAccess/tenantAdminAccess.service';
 import { AppButton } from '@/shared/components/AppButton';
 import { DataTable } from '@/shared/components/DataTable';
@@ -20,15 +22,20 @@ import {
   isBusinessActionSelected,
 } from '@/shared/adapters/rbacDisplay.adapter';
 import type { BusinessPermissionAction } from '@/shared/adapters/rbacDisplay.adapter';
-import type { RolePermissionGrants } from '@/shared/types/rbac.types';
-import { useEffect } from 'react';
+import type { Role, RolePermissionGrants } from '@/shared/types/rbac.types';
+import type { UserRecord } from '@/shared/types/auth.types';
 
 const countGrants = (permissions: RolePermissionGrants): number =>
   Object.values(permissions).reduce((total, grants) => total + grants.length, 0);
 
 export const TenantAdminAccessPage = () => {
+  const session = useAuthStore((state) => state.session);
   const { showToast } = useToast();
+  const [organizations, setOrganizations] = useState<TenantAccessOrganization[]>([]);
   const [admins, setAdmins] = useState<TenantAdminRow[]>([]);
+  const [selectedOrgId, setSelectedOrgId] = useState('');
+  const [tenantUsers, setTenantUsers] = useState<UserRecord[]>([]);
+  const [tenantRoles, setTenantRoles] = useState<Role[]>([]);
   const [selectedAdmin, setSelectedAdmin] = useState<TenantAdminRow | null>(null);
   const [matrix, setMatrix] = useState<TenantAdminAccessMatrix | null>(null);
   const [draftPermissions, setDraftPermissions] = useState<RolePermissionGrants>({});
@@ -49,22 +56,71 @@ export const TenantAdminAccessPage = () => {
       }), {}),
     [rows],
   );
+  const selectedOrganization = organizations.find((org) => org.orgId === selectedOrgId);
+  const tenantRoleNameById = useMemo(
+    () => new Map(tenantRoles.map((role) => [role.id, role.name])),
+    [tenantRoles],
+  );
 
-  const loadAdmins = async () => {
+  const loadTenantContext = async () => {
     setIsLoadingList(true);
     try {
-      setAdmins(await tenantAdminAccessService.listTenantAdmins());
+      const [nextOrganizations, nextAdmins] = await Promise.all([
+        tenantAdminAccessService.listOrganizations(),
+        tenantAdminAccessService.listTenantAdmins(),
+      ]);
+      setOrganizations(nextOrganizations);
+      setAdmins(nextAdmins);
+      const nextOrgId = selectedOrgId || nextOrganizations[0]?.orgId || '';
+      setSelectedOrgId(nextOrgId);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Unable to load tenant admins.', 'error');
+      showToast(error instanceof Error ? error.message : 'Unable to load tenant access data.', 'error');
+    } finally {
+      setIsLoadingList(false);
+    }
+  };
+
+  const loadSelectedOrganization = async (orgId: string, orgCode = '') => {
+    if (!orgId) {
+      setTenantUsers([]);
+      setTenantRoles([]);
+      return;
+    }
+
+    setIsLoadingList(true);
+    try {
+      const [nextUsers, nextRoles] = await Promise.all([
+        tenantAdminAccessService.listOrganizationUsers(orgId, orgCode),
+        tenantAdminAccessService.listOrganizationRoles(orgId),
+      ]);
+      setTenantUsers(nextUsers);
+      setTenantRoles(nextRoles);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to load selected organization.', 'error');
     } finally {
       setIsLoadingList(false);
     }
   };
 
   useEffect(() => {
-    void loadAdmins();
+    if (session?.org.code !== 'PLATFORM') return;
+    void loadTenantContext();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [session?.org.code]);
+
+  useEffect(() => {
+    if (session?.org.code !== 'PLATFORM') return;
+    void loadSelectedOrganization(selectedOrgId, selectedOrganization?.orgCode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedOrgId, session?.org.code]);
+
+  const selectOrganization = (orgId: string) => {
+    setSelectedOrgId(orgId);
+    setSelectedAdmin(null);
+    setMatrix(null);
+    setDraftPermissions({});
+    setIsDirty(false);
+  };
 
   const manageAccess = async (admin: TenantAdminRow) => {
     setSelectedAdmin(admin);
@@ -99,7 +155,7 @@ export const TenantAdminAccessPage = () => {
       setMatrix(nextMatrix);
       setDraftPermissions(nextMatrix.permissions);
       setIsDirty(false);
-      await loadAdmins();
+      await loadTenantContext();
       showToast('Tenant admin access updated. Changes apply after next login.');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Unable to update tenant admin access.', 'error');
@@ -108,12 +164,87 @@ export const TenantAdminAccessPage = () => {
     }
   };
 
+  if (session?.org.code !== 'PLATFORM') {
+    return <EmptyState title="Unauthorized" description="Only platform super admins can access cross-tenant views." />;
+  }
+
   return (
     <>
       <PageHeader
-        title="Tenant Admin Access"
-        subtitle="Control which permissions organization admins can delegate inside their tenant."
+        title="Platform tenant access — cross-tenant view"
+        subtitle="Select an organization to inspect tenant users, roles, and organization admin access."
       />
+
+      <Stack spacing={2}>
+        <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2 }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ xs: 'stretch', md: 'center' }}>
+            <TextField
+              select
+              label="Organization"
+              value={selectedOrgId}
+              onChange={(event) => selectOrganization(event.target.value)}
+              sx={{ minWidth: { md: 320 } }}
+            >
+              {organizations.map((org) => (
+                <MenuItem key={org.orgId} value={org.orgId}>
+                  {org.orgName} ({org.orgCode})
+                </MenuItem>
+              ))}
+            </TextField>
+            <Alert severity="info" sx={{ flexGrow: 1 }}>
+              Normal Users and Roles pages remain scoped to the logged-in organization. This page is the explicit platform cross-tenant view.
+            </Alert>
+          </Stack>
+        </Paper>
+
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1.2fr 0.8fr' }, gap: 2 }}>
+          <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2, minHeight: 320 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Selected organization users</Typography>
+            {isLoadingList && tenantUsers.length === 0 ? (
+              <Stack alignItems="center" sx={{ py: 6 }}><CircularProgress size={28} /></Stack>
+            ) : tenantUsers.length === 0 ? (
+              <EmptyState title="No users found" description="Select an organization to view its users." />
+            ) : (
+              <DataTable
+                rows={tenantUsers}
+                getRowId={(user) => user.id}
+                columns={[
+                  { id: 'name', label: 'Name', render: (user) => user.name },
+                  { id: 'email', label: 'Email', render: (user) => user.email },
+                  {
+                    id: 'roles',
+                    label: 'Roles',
+                    render: (user) => (
+                      <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+                        {user.roleIds.map((roleId) => (
+                          <Chip key={roleId} label={tenantRoleNameById.get(roleId) ?? roleId} size="small" />
+                        ))}
+                      </Stack>
+                    ),
+                  },
+                  { id: 'status', label: 'Status', render: (user) => user.status },
+                ]}
+              />
+            )}
+          </Paper>
+
+          <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2, minHeight: 320 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Selected organization roles</Typography>
+            {tenantRoles.length === 0 ? (
+              <EmptyState title="No roles found" description="Select an organization to view its roles." />
+            ) : (
+              <DataTable
+                rows={tenantRoles}
+                getRowId={(role) => role.id}
+                columns={[
+                  { id: 'code', label: 'Code', render: (role) => role.code },
+                  { id: 'name', label: 'Name', render: (role) => role.name },
+                  { id: 'type', label: 'Type', render: (role) => <Chip label={role.isSystem ? 'System' : 'Custom'} size="small" /> },
+                ]}
+              />
+            )}
+          </Paper>
+        </Box>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '460px 1fr' }, gap: 2 }}>
         <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', p: 2, minHeight: 620 }}>
@@ -124,7 +255,7 @@ export const TenantAdminAccessPage = () => {
             <EmptyState title="No tenant admins found" description="Signup-created organization admins will appear here." />
           ) : (
             <DataTable
-              rows={admins}
+              rows={selectedOrgId ? admins.filter((admin) => admin.orgId === selectedOrgId) : admins}
               getRowId={(admin) => `${admin.orgId}-${admin.adminUserId}`}
               columns={[
                 {
@@ -227,7 +358,10 @@ export const TenantAdminAccessPage = () => {
                                 key={permission.id}
                                 label={permission.label}
                                 selected={isBusinessActionSelected(draftPermissions, permission)}
-                                onClick={() => toggleGrant(permission)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleGrant(permission);
+                                }}
                               />
                             ))}
                           </Stack>
@@ -241,6 +375,7 @@ export const TenantAdminAccessPage = () => {
           )}
         </Paper>
       </Box>
+      </Stack>
     </>
   );
 };

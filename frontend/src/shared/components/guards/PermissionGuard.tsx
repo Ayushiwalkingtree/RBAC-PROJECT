@@ -10,6 +10,7 @@ type PermissionGuardProps = PropsWithChildren<{
   resource?: ResourceKey;
   permission?: PermissionKey;
   anyOf?: ReadonlyArray<{ resource: ResourceKey; permission: PermissionKey }>;
+  allOf?: ReadonlyArray<{ resource: ResourceKey; permission: PermissionKey }>;
   fallback?: ReactNode;
   redirect?: boolean;
 }>;
@@ -31,14 +32,19 @@ export const PermissionGuard = ({
   resource,
   permission,
   anyOf,
+  allOf,
   fallback = null,
   redirect = false,
   children,
 }: PermissionGuardProps) => {
-  const { can, canAny } = usePermission();
+  const { can, canAny, canAll } = usePermission();
   const navigation = useAuthStore((state) => state.session?.navigation ?? []);
 
-  const isAllowed = anyOf ? canAny(anyOf) : Boolean(resource && permission && can(resource, permission));
+  const isAllowed = allOf
+    ? canAll(allOf)
+    : anyOf
+      ? canAny(anyOf)
+      : Boolean(resource && permission && can(resource, permission));
 
   if (!isAllowed) {
     if (!redirect) {
