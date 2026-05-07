@@ -4,7 +4,6 @@ This repository is split into a frontend app and backend services:
 
 - `frontend/` - React, TypeScript, Vite UI
 - `services/core-service/` - FastAPI, SQLAlchemy, Alembic RBAC API service
-- `services/ticket-service/` - FastAPI ticket microservice protected by core RBAC JWT permissions
 
 ## Run Frontend
 
@@ -26,15 +25,15 @@ VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
 cd services/core-service
 alembic upgrade head
 python scripts/seed.py
-uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
-## Run Ticket Service
+## API Swagger
 
-```bash
-cd services/ticket-service
-uvicorn app.main:app --reload --port 9000
-```
+After starting the core service, open:
+
+- Swagger UI: `http://127.0.0.1:8000/docs`
+- OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
 
 ## Root Convenience Scripts
 
@@ -43,6 +42,5 @@ npm run dev:frontend
 npm run build:frontend
 npm run lint:frontend
 npm run dev:core
-npm run dev:ticket
 npm run seed:core
 ```

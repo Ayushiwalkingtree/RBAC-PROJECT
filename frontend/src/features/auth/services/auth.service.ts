@@ -173,8 +173,8 @@ export const authService = {
       code: payload.org_code,
       name: input.org_name,
       status: 'active',
-      timezone: input.timezone,
-      plan: input.plan,
+      timezone: 'Asia/Kolkata',
+      plan: 'STARTER',
     };
     const user: UserRecord = {
       id: String(payload.admin_user_id),

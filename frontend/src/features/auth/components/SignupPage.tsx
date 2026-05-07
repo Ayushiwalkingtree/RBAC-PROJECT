@@ -6,7 +6,6 @@ import {
   Container,
   Grid,
   Link,
-  MenuItem,
   Paper,
   Stack,
   TextField,
@@ -21,34 +20,20 @@ import { signupSchema, type SignupFormValues } from '@/features/auth/schemas/sig
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { APP_CONFIG } from '@/shared/constants/app.constants';
 import { ROUTES } from '@/shared/constants/route.constants';
-import { STORAGE_KEYS } from '@/shared/constants/storage.constants';
 
 const defaultValues: SignupFormValues = {
   org_name: '',
-  org_code: '',
   admin_name: '',
   admin_email: '',
   password: '',
-  timezone: 'Asia/Calcutta',
-  plan: 'Starter',
 };
-
-const plans = ['Starter', 'Business', 'Enterprise'];
-const timezones = ['Asia/Calcutta', 'UTC', 'America/New_York', 'Europe/London', 'Asia/Singapore'];
-
-const generateOrgCode = (name: string): string =>
-  name
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/gu, '_')
-    .replace(/^_+|_+$/gu, '');
 
 export const SignupPage = () => {
   const isAuthenticated = useAuthStore((store) => store.isAuthenticated);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [devVerificationUrl, setDevVerificationUrl] = useState('');
-  const { control, handleSubmit, setValue, formState } = useForm<SignupFormValues>({
+  const { control, handleSubmit } = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues,
   });
@@ -59,7 +44,6 @@ export const SignupPage = () => {
       setSuccessMessage('');
       setDevVerificationUrl('');
       const result = await authService.signupTenant(values);
-      window.localStorage.setItem(STORAGE_KEYS.lastOrgCode, result.org.code);
       setSuccessMessage(result.message ?? 'Organization created. Please check your email to verify your account.');
       setDevVerificationUrl(result.devVerificationUrl ?? '');
     } catch (signupError) {
@@ -116,7 +100,6 @@ export const SignupPage = () => {
                   The first user becomes the verified organization admin after email verification.
                 </Typography>
               </Box>
-            <Alert severity="info">Organization codes are global; emails are unique only inside an organization.</Alert>
             {successMessage && (
               <Alert
                 severity="success"
@@ -145,22 +128,8 @@ export const SignupPage = () => {
                     label="Organization name"
                     error={Boolean(fieldState.error)}
                     helperText={fieldState.error?.message}
-                    onChange={(event) => {
-                      field.onChange(event);
-                      if (!formState.dirtyFields.org_code) {
-                        setValue('org_code', generateOrgCode(event.target.value), {
-                          shouldDirty: false,
-                          shouldValidate: true,
-                        });
-                      }
-                    }}
                     fullWidth
                   />
-                )} />
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <Controller name="org_code" control={control} render={({ field, fieldState }) => (
-                  <TextField {...field} label="Organization code" error={Boolean(fieldState.error)} helperText={fieldState.error?.message} fullWidth />
                 )} />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
@@ -170,26 +139,12 @@ export const SignupPage = () => {
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Controller name="admin_email" control={control} render={({ field, fieldState }) => (
-                  <TextField {...field} label="Admin email" error={Boolean(fieldState.error)} helperText={fieldState.error?.message} fullWidth />
+                  <TextField {...field} label="Admin organization email" error={Boolean(fieldState.error)} helperText={fieldState.error?.message} fullWidth />
                 )} />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Controller name="password" control={control} render={({ field, fieldState }) => (
                   <TextField {...field} type="password" label="Password" error={Boolean(fieldState.error)} helperText={fieldState.error?.message} fullWidth />
-                )} />
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <Controller name="timezone" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Timezone" fullWidth>
-                    {timezones.map((timezone) => <MenuItem key={timezone} value={timezone}>{timezone}</MenuItem>)}
-                  </TextField>
-                )} />
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <Controller name="plan" control={control} render={({ field }) => (
-                  <TextField {...field} select label="Plan" fullWidth>
-                    {plans.map((plan) => <MenuItem key={plan} value={plan}>{plan}</MenuItem>)}
-                  </TextField>
                 )} />
               </Grid>
             </Grid>

@@ -8,7 +8,10 @@ from app.models.base import AuditColumns, Base, int_pk
 
 class User(Base, AuditColumns):
     __tablename__ = "at_user"
-    __table_args__ = (UniqueConstraint("at_organization_id", "email", name="uq_user_org_email"),)
+    __table_args__ = (
+        UniqueConstraint("at_organization_id", "email", name="uq_user_org_email"),
+        UniqueConstraint("email", name="uq_at_user_email"),
+    )
 
     id: Mapped[int_pk]
     at_organization_id: Mapped[int] = mapped_column(ForeignKey("at_organization.id"), index=True)

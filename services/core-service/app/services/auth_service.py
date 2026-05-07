@@ -40,11 +40,11 @@ class AuthService:
         return current_roles, perms, nav
 
     async def login(self, payload: LoginRequest, user_agent: str | None = None) -> AuthResponse:
-        org = await self.org_repo.get_by_code(payload.org_code)
-        if not org or not org.is_active:
-            raise AppError(401, "INVALID_CREDENTIALS", "Wrong email or password")
-        user = await self.user_repo.get_by_email(org.id, str(payload.email))
+        user = await self.user_repo.get_by_email(str(payload.email))
         if not user:
+            raise AppError(401, "INVALID_CREDENTIALS", "Wrong email or password")
+        org = await self.org_repo.get(user.at_organization_id)
+        if not org or not org.is_active:
             raise AppError(401, "INVALID_CREDENTIALS", "Wrong email or password")
         if not user.is_email_verified:
             raise AppError(403, "EMAIL_NOT_VERIFIED", "Verify email before login")

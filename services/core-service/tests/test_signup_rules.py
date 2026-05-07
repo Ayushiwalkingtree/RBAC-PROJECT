@@ -1,5 +1,6 @@
-from app.services.signup_service import CORE_ORG_ADMIN_PERMISSIONS
-from app.schemas.signup import SignupResponse
+from app.schemas.signup import SignupRequest, SignupResponse
+from app.services.signup_service import DEFAULT_SIGNUP_PLAN, DEFAULT_SIGNUP_TIMEZONE, CORE_ORG_ADMIN_PERMISSIONS
+from app.utils.email_domain import email_domain, is_public_email_domain
 
 
 def test_signup_org_admin_core_permissions_exclude_resource_registry() -> None:
@@ -25,3 +26,27 @@ def test_signup_response_does_not_expose_verification_token() -> None:
     )
 
     assert "verification_token" not in response.model_dump()
+
+
+def test_signup_request_does_not_require_org_code_plan_or_timezone() -> None:
+    payload = SignupRequest(
+        org_name="Demo Tenant",
+        admin_name="Demo Admin",
+        admin_email="admin@example.com",
+        password="SecurePass123!",
+    )
+
+    assert payload.model_dump() == {
+        "org_name": "Demo Tenant",
+        "admin_name": "Demo Admin",
+        "admin_email": "admin@example.com",
+        "password": "SecurePass123!",
+    }
+    assert DEFAULT_SIGNUP_TIMEZONE == "Asia/Kolkata"
+    assert DEFAULT_SIGNUP_PLAN == "STARTER"
+
+
+def test_signup_business_email_domain_rules() -> None:
+    assert email_domain("Admin@ABC.com") == "abc.com"
+    assert is_public_email_domain("gmail.com")
+    assert not is_public_email_domain("abc.com")

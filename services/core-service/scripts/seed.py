@@ -15,6 +15,16 @@ PASSWORD = "SecurePass123!"
 
 VIEW_PERMISSION = [{"key": "VIEW", "label": "View"}]
 
+REMOVED_RESOURCE_KEYS = {
+    "TICKETS_MENU",
+    "TICKET_LIST_API",
+    "TICKET_CREATE_API",
+    "TICKET_UPDATE_API",
+    "TICKET_DELETE_API",
+    "TICKET_ASSIGN_API",
+    "TICKET_ASSIGN_BTN",
+}
+
 CORE_RESOURCES: list[dict] = [
     {"resource_key": "USER_MENU", "resource_name": "Users", "resource_type": "MENU", "resource_group": "Identity", "permissions": ["VIEW", "CREATE", "READ", "UPDATE", "DELETE"], "is_ui_visible": True, "ui_path": "/users", "sequence_no": 20},
     {"resource_key": "USER_LIST_API", "resource_name": "List Users API", "resource_type": "API", "resource_group": "Identity", "permissions": ["READ"], "http_method": "GET", "api_path": "/api/v1/users", "microservice": "core-service"},
@@ -53,13 +63,6 @@ CORE_RESOURCES: list[dict] = [
     {"resource_key": "ORG_SETTINGS", "resource_name": "Organization Settings", "resource_type": "API", "resource_group": "Administration", "permissions": ["VIEW", "UPDATE"], "http_method": "PUT", "api_path": "/api/v1/organization", "microservice": "core-service"},
     {"resource_key": "AUDIT_LOG_API", "resource_name": "Audit Logs API", "resource_type": "API", "resource_group": "Administration", "permissions": ["READ"], "http_method": "GET", "api_path": "/api/v1/audit-logs", "microservice": "core-service"},
     {"resource_key": "NAV_ORDER_API", "resource_name": "Navigation Order API", "resource_type": "API", "resource_group": "Administration", "permissions": ["READ", "UPDATE"], "http_method": "PUT", "api_path": "/api/v1/navigation/order", "microservice": "core-service"},
-    {"resource_key": "TICKETS_MENU", "resource_name": "Tickets", "resource_type": "MENU", "resource_group": "Workspace", "permissions": ["VIEW", "CREATE", "READ", "UPDATE", "DELETE"], "is_ui_visible": True, "ui_path": "/tickets", "sequence_no": 4},
-    {"resource_key": "TICKET_LIST_API", "resource_name": "List Tickets API", "resource_type": "API", "resource_group": "Workspace", "permissions": ["READ", "EXPORT"], "http_method": "GET", "api_path": "/api/v1/tickets", "microservice": "ticket-service"},
-    {"resource_key": "TICKET_CREATE_API", "resource_name": "Create Ticket API", "resource_type": "API", "resource_group": "Workspace", "permissions": ["EXECUTE"], "http_method": "POST", "api_path": "/api/v1/tickets", "microservice": "ticket-service"},
-    {"resource_key": "TICKET_UPDATE_API", "resource_name": "Update Ticket API", "resource_type": "API", "resource_group": "Workspace", "permissions": ["EXECUTE"], "http_method": "PUT", "api_path": "/api/v1/tickets/{ticket_id}", "microservice": "ticket-service"},
-    {"resource_key": "TICKET_DELETE_API", "resource_name": "Delete Ticket API", "resource_type": "API", "resource_group": "Workspace", "permissions": ["EXECUTE"], "http_method": "DELETE", "api_path": "/api/v1/tickets/{ticket_id}", "microservice": "ticket-service"},
-    {"resource_key": "TICKET_ASSIGN_API", "resource_name": "Assign Ticket API", "resource_type": "API", "resource_group": "Workspace", "permissions": ["ASSIGN"], "http_method": "POST", "api_path": "/api/v1/tickets/{ticket_id}/assign", "microservice": "ticket-service"},
-    {"resource_key": "TICKET_ASSIGN_BTN", "resource_name": "Assign Ticket", "resource_type": "BUTTON", "resource_group": "Workspace", "permissions": ["VIEW"], "parent_resource_key": "TICKETS_MENU"},
     {"resource_key": "DASH_MENU", "resource_name": "Dashboard", "resource_type": "MENU", "resource_group": "Workspace", "permissions": ["VIEW"], "is_ui_visible": True, "ui_path": "/dashboard", "sequence_no": 10},
     {"resource_key": "DASH_MAIN", "resource_name": "Main Dashboard", "resource_type": "DASHBOARD", "resource_group": "Workspace", "permissions": ["VIEW"], "is_ui_visible": True, "ui_path": "/dashboard", "parent_resource_key": "DASH_MENU", "sequence_no": 11},
     {"resource_key": "REPORTS_MENU", "resource_name": "Reports", "resource_type": "MENU", "resource_group": "Reports", "permissions": ["VIEW"], "is_ui_visible": True, "ui_path": "/reports", "sequence_no": 40},
@@ -144,6 +147,21 @@ async def main() -> None:
         await session.flush()
 
         resources: list[Resource] = []
+        removed_result = await session.execute(
+            select(Resource).where(Resource.resource_key.in_(REMOVED_RESOURCE_KEYS))
+        )
+        for removed_resource in removed_result.scalars():
+            removed_resource.is_active = False
+            removed_resource.is_deleted = True
+            removed_resource.is_ui_visible = False
+
+        removed_permission_result = await session.execute(
+            select(ResourcePermission).where(ResourcePermission.resource_key.in_(REMOVED_RESOURCE_KEYS))
+        )
+        for removed_permission in removed_permission_result.scalars():
+            removed_permission.is_active = False
+            removed_permission.is_deleted = True
+
         for item in CORE_RESOURCES:
             payload = dict(item)
             permissions = payload.pop("permissions")

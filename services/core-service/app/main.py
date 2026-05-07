@@ -4,7 +4,6 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.endpoints.internal import router as internal_router
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.errors import AppError, error_response
@@ -13,7 +12,13 @@ from app.services.audit_service import reset_audit_context, set_audit_context
 
 configure_logging()
 
-app = FastAPI(title="Core RBAC API", version="0.1.0")
+app = FastAPI(
+    title="Core RBAC API",
+    version="0.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,4 +63,3 @@ async def health():
 
 
 app.include_router(api_router)
-app.include_router(internal_router)

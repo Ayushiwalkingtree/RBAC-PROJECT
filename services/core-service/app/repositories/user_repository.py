@@ -9,7 +9,16 @@ class UserRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_by_email(self, org_id: int, email: str) -> User | None:
+    async def get_by_email(self, email: str) -> User | None:
+        result = await self.session.execute(
+            select(User).where(
+                func.lower(User.email) == email.lower(),
+                User.is_deleted.is_(False),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_email_scoped(self, org_id: int, email: str) -> User | None:
         result = await self.session.execute(
             select(User).where(
                 User.at_organization_id == org_id,

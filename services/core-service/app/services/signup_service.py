@@ -12,8 +12,13 @@ from app.services.audit_service import AuditService
 from app.services.email_service import EmailService
 from app.services.verification_store import get_verification_token, pop_verification_token, store_verification_token
 from app.utils.datetime import utcnow
+from app.utils.email_domain import email_domain, is_public_email_domain
 from app.utils.password import hash_password
+from app.utils.slug import org_code_from_name
 from app.utils.tokens import new_verification_token
+
+DEFAULT_SIGNUP_TIMEZONE = "Asia/Kolkata"
+DEFAULT_SIGNUP_PLAN = "STARTER"
 
 CORE_ORG_ADMIN_PERMISSIONS: dict[str, list[str]] = {
     "USER_LIST_API": ["READ"],
@@ -62,6 +67,20 @@ def dev_verification_url(token: str) -> str | None:
     return None
 
 
+async def unique_org_code(org_repo: OrganizationRepository, org_name: str) -> str:
+    base_code = org_code_from_name(org_name) or "ORG"
+    base_code = base_code[:70].rstrip("_") or "ORG"
+    org_code = base_code
+    suffix = 2
+
+    while await org_repo.get_by_code(org_code):
+        suffix_text = f"_{suffix}"
+        org_code = f"{base_code[:80 - len(suffix_text)]}{suffix_text}"
+        suffix += 1
+
+    return org_code
+
+
 class SignupService:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -71,19 +90,31 @@ class SignupService:
         self.email_service = EmailService()
 
     async def signup(self, payload: SignupRequest) -> SignupResponse:
-        org_code = payload.org_code.strip().upper()
-        if await self.org_repo.get_by_code(org_code):
-            raise AppError(409, "ORG_CODE_EXISTS", "Organization code already exists")
+        admin_email = str(payload.admin_email).lower()
+        org_email_domain = email_domain(admin_email)
+        if is_public_email_domain(org_email_domain):
+            raise AppError(
+                400,
+                "BUSINESS_EMAIL_REQUIRED",
+                "Use your organization email domain, not a public email provider.",
+            )
+
+        existing_user = await self.user_repo.get_by_email(admin_email)
+        if existing_user:
+            raise AppError(409, "EMAIL_EXISTS", "This email is already registered.")
+
+        org_code = await unique_org_code(self.org_repo, payload.org_name)
 
         org = Organization(
             org_code=org_code,
             org_name=payload.org_name.strip(),
-            timezone=payload.timezone,
-            plan=payload.plan.upper(),
-            support_email=str(payload.admin_email),
+            timezone=DEFAULT_SIGNUP_TIMEZONE,
+            plan=DEFAULT_SIGNUP_PLAN,
+            support_email=admin_email,
             settings_json={
-                "timezone": payload.timezone,
-                "support_email": str(payload.admin_email),
+                "timezone": DEFAULT_SIGNUP_TIMEZONE,
+                "support_email": admin_email,
+                "email_domain": org_email_domain,
                 "allowed_origins": [],
             },
         )
@@ -108,7 +139,7 @@ class SignupService:
 
         user = User(
             at_organization_id=org.id,
-            email=str(payload.admin_email).lower(),
+            email=admin_email,
             password_hash=hash_password(payload.password),
             full_name=payload.admin_name.strip(),
             title="Organization Admin",

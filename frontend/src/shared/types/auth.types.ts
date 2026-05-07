@@ -54,19 +54,15 @@ export type AuthSession = {
 };
 
 export type LoginCredentials = {
-  org_code: string;
   email: string;
   password: string;
 };
 
 export type SignupInput = {
   org_name: string;
-  org_code: string;
   admin_name: string;
   admin_email: string;
   password: string;
-  timezone: string;
-  plan: string;
 };
 
 export type SignupResult = {

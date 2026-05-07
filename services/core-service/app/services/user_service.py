@@ -11,6 +11,7 @@ from app.services.audit_service import AuditService
 from app.services.email_service import EmailService
 from app.services.verification_store import store_verification_token
 from app.utils.datetime import utcnow
+from app.utils.email_domain import email_domain
 from app.utils.password import hash_password
 from app.utils.tokens import new_verification_token
 
@@ -22,6 +23,16 @@ def dev_verification_url(token: str) -> str | None:
     ):
         return f"{settings.frontend_verify_email_url}?token={token}"
     return None
+
+
+def validate_org_email_domain(org, email: str) -> None:
+    org_domain = (org.settings_json or {}).get("email_domain")
+    if org_domain and email_domain(email) != str(org_domain).lower():
+        raise AppError(
+            400,
+            "ORG_EMAIL_DOMAIN_MISMATCH",
+            f"Use an email from the organization domain: {org_domain}",
+        )
 
 
 class UserService:
@@ -43,9 +54,11 @@ class UserService:
         org = await self.org_repo.get(org_id)
         if not org or org.is_deleted:
             raise AppError(404, "ORGANIZATION_NOT_FOUND", "Organization was not found")
-        existing_user = await self.repo.get_by_email(org_id, str(payload.email))
+        email = str(payload.email).lower()
+        validate_org_email_domain(org, email)
+        existing_user = await self.repo.get_by_email(email)
         if existing_user:
-            message = "This email already exists in the selected organization."
+            message = "This email is already registered."
             if not existing_user.is_email_verified:
                 message += " User already exists but is not verified. Resend verification email."
             raise AppError(409, "EMAIL_EXISTS", message)
@@ -57,7 +70,7 @@ class UserService:
                 raise AppError(404, "ROLE_NOT_FOUND", "Role was not found")
         user = User(
             at_organization_id=org_id,
-            email=str(payload.email).lower(),
+            email=email,
             password_hash=hash_password(payload.password),
             full_name=payload.full_name,
             title=payload.title,
@@ -115,10 +128,15 @@ class UserService:
             "is_active": user.is_active,
         }
         if payload.email:
-            duplicate = await self.repo.get_by_email(org_id, str(payload.email))
+            email = str(payload.email).lower()
+            org = await self.org_repo.get(org_id)
+            if not org or org.is_deleted:
+                raise AppError(404, "ORGANIZATION_NOT_FOUND", "Organization was not found")
+            validate_org_email_domain(org, email)
+            duplicate = await self.repo.get_by_email(email)
             if duplicate and duplicate.id != user.id:
-                raise AppError(409, "EMAIL_EXISTS", "Email already exists in this organization")
-            user.email = str(payload.email).lower()
+                raise AppError(409, "EMAIL_EXISTS", "Email is already registered")
+            user.email = email
         if payload.full_name:
             user.full_name = payload.full_name
         if payload.password:

@@ -3,12 +3,9 @@ from pydantic import BaseModel, EmailStr, Field
 
 class SignupRequest(BaseModel):
     org_name: str = Field(min_length=2)
-    org_code: str = Field(min_length=2)
     admin_name: str = Field(min_length=2)
     admin_email: EmailStr
     password: str = Field(min_length=8)
-    timezone: str = "Asia/Kolkata"
-    plan: str = "STARTER"
 
 
 class SignupResponse(BaseModel):
