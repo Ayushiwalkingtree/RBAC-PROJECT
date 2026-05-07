@@ -1,0 +1,135 @@
+# _format_version: "3.0"
+
+# services:
+#   - name: notification-service
+#     url: http://localhost:8001
+#     routes:
+#       - name: api-route
+#         paths:
+#           - /api/v1
+#         strip_path: false
+
+# plugins:
+#   - name: cors
+#     config:
+#       origins:
+#         - "*"
+#       methods:
+#         - GET
+#         - POST
+#         - PUT
+#         - DELETE
+#         - OPTIONS
+#       headers:
+#         - Content-Type
+#         - X-Org-Id
+#         - X-User-Id
+#         - Authorization
+
+
+
+# ═══════════════════════════════════════════════════════════════
+#  kong.yml — Kong Declarative Configuration
+#  Kong sits between Frontend/Other Systems and FastAPI backend
+#
+#  WITHOUT KONG:  UI → http://localhost:8001/api/v1
+#  WITH KONG:     UI → http://localhost:8000/api/v1
+#                      ↓ Kong forwards to ↓
+#                 FastAPI → http://localhost:8001/api/v1
+#
+#  Run: kong config load kong.yml
+# ═══════════════════════════════════════════════════════════════
+
+_format_version: "3.0"
+_transform: true
+
+# ── Services — points Kong to your FastAPI backend ───────────
+# THIS IS THE KEY LINE: upstream_url tells Kong where FastAPI is
+services:
+  - name: notification-service
+    url: http://localhost:8001          # ← Kong forwards to FastAPI on 8001
+    connect_timeout: 10000
+    read_timeout: 30000
+    write_timeout: 30000
+
+    # ── Routes — what URLs Kong exposes to the outside world ──
+    # THESE LINES expose FastAPI routes through Kong on port 8000
+    routes:
+      - name: api-v1-all
+        paths:
+          - /api/v1                     # ← all /api/v1/* requests come through Kong
+        strip_path: false               # ← keep /api/v1 in the path when forwarding
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+
+    # ── Plugins — Kong adds these before forwarding to FastAPI ─
+    plugins:
+
+      # 1. JWT Authentication
+      # REASON: Validates Bearer token before request reaches FastAPI
+      # FastAPI's security.py already reads JWT — Kong just adds a first check
+      - name: jwt
+        config:
+          key_claim_name: kid           # JWT header field for key lookup
+          claims_to_verify:
+            - exp                       # rejects expired tokens automatically
+
+      # 2. Rate Limiting
+      # REASON: Prevents abuse — max 100 requests per minute per IP
+      - name: rate-limiting
+        config:
+          minute: 100                   # ← 100 req/min per consumer
+          policy: local
+
+      # 3. CORS
+      # REASON: Allows your frontend (localhost:8000) to call Kong (localhost:8000)
+      # Without this, browser blocks cross-origin requests
+      - name: cors
+        config:
+          origins:
+            - http://localhost:8000     # ← your frontend URL
+            - http://192.168.1.89:8000  # ← your LAN IP frontend
+            - "*"                       # ← allow all (remove in production)
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+          headers:
+            - Content-Type
+            - Authorization
+            - X-Org-Id
+            - X-User-Id
+          exposed_headers:
+            - X-Auth-Token
+          credentials: true
+          max_age: 3600
+
+      # 4. Request Logging
+      # REASON: Every API call is logged — you can see who called what
+      - name: file-log
+        config:
+          path: /tmp/kong-access.log    # ← check this file to see all API calls
+          reopen: true
+
+# ── Consumers — represents systems that call your API ────────
+# REASON: Ties JWT keys to specific callers (Mira, EngazeWell etc.)
+consumers:
+  - username: notification-ui          # your frontend UI
+    jwt_secrets:
+      - key: notification-ui-key
+        secret: your-secret-key-here   # ← change this
+
+  - username: mira-service             # Mira app
+    jwt_secrets:
+      - key: mira-service-key
+        secret: mira-secret-key-here   # ← change this
+
+  - username: local-dev                # for local testing without JWT
+    keyauth_credentials:
+      - key: dev-api-key

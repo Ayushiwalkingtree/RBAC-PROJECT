@@ -41,15 +41,16 @@ python scripts/seed.py
 6. Start server:
 
 ```bash
-python -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 3000
 ```
 
 ## API Swagger
 
 With the server running, all core-service API docs are available at:
 
-- Swagger UI: `http://127.0.0.1:8000/docs`
-- OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
+- Direct Swagger UI: `http://127.0.0.1:3000/docs`
+- Direct OpenAPI JSON: `http://127.0.0.1:3000/openapi.json`
+- Kong Swagger UI: `http://127.0.0.1:8000/core/docs`
 
 ## Developer Commands
 

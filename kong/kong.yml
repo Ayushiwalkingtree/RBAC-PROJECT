@@ -1,0 +1,67 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: core-service
+    url: http://host.docker.internal:3000
+    connect_timeout: 10000
+    read_timeout: 60000
+    write_timeout: 60000
+    routes:
+      - name: core-service-route
+        paths:
+          - /core
+        strip_path: true
+      - name: core-service-openapi-route
+        paths:
+          - /openapi.json
+        strip_path: false
+
+  - name: notification-service
+    url: http://host.docker.internal:3001
+    connect_timeout: 10000
+    read_timeout: 60000
+    write_timeout: 60000
+    routes:
+      - name: notification-service-route
+        paths:
+          - /notification
+        strip_path: true
+
+  - name: workflow-service
+    url: http://host.docker.internal:3002
+    connect_timeout: 10000
+    read_timeout: 60000
+    write_timeout: 60000
+    routes:
+      - name: workflow-service-route
+        paths:
+          - /workflow
+        strip_path: true
+
+plugins:
+  - name: cors
+    config:
+      origins:
+        - http://localhost:5173
+        - http://127.0.0.1:5173
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+        - X-Org-Id
+        - X-User-Id
+        - X-Request-Id
+        - X-Correlation-Id
+      exposed_headers:
+        - X-Request-Id
+        - X-Correlation-Id
+      credentials: true
+      max_age: 3600

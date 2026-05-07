@@ -3,7 +3,13 @@
     "dev:frontend": "cd frontend && npm run dev",
     "build:frontend": "cd frontend && npm run build",
     "lint:frontend": "cd frontend && npm run lint",
-    "dev:core": "cd services/core-service && python -m uvicorn app.main:app --reload --port 8000",
-    "seed:core": "cd services/core-service && python scripts/seed.py"
+    "dev:core": "powershell -ExecutionPolicy Bypass -File scripts/run-service.ps1 core",
+    "dev:notification": "powershell -ExecutionPolicy Bypass -File scripts/run-service.ps1 notification",
+    "dev:workflow": "powershell -ExecutionPolicy Bypass -File scripts/run-service.ps1 workflow",
+    "seed:core": "cd services/core-service && python scripts/seed.py",
+    "seed:notification": "cd services/notification-service && python scripts/seed_providers.py",
+    "dev:kong": "docker compose -f docker-compose.kong.yml up",
+    "kong:down": "docker compose -f docker-compose.kong.yml down",
+    "kong:validate": "docker compose -f docker-compose.kong.yml run --rm kong kong config parse /kong/declarative/kong.yml"
   }
 }
